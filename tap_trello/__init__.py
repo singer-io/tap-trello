@@ -15,6 +15,7 @@ STREAM_OBJECTS = {'foo': streams.Foo}
 def _get_abs_path(path):
     return os.path.join(os.path.dirname(os.path.realpath(__file__)), path)
 
+
 # Load schemas from schemas folder
 def _load_schemas():
     schemas = {}
@@ -26,7 +27,6 @@ def _load_schemas():
             schemas[file_raw] = json.load(file)
 
     return schemas
-
 
 
 def do_discover():
@@ -55,6 +55,7 @@ def do_discover():
 
 def do_sync():
     LOGGER.warning("Sync not implemented")
+
 
 @utils.handle_top_exception(LOGGER)
 def main():
