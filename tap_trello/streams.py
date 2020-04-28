@@ -5,11 +5,9 @@ class Stream:
     key_properties = ["id"]
     replication_keys = []
     replication_method = None
-    
+
 
 class Foo(Stream):
     """
     Dummy class for discovery
     """
-
-

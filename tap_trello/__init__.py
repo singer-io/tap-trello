@@ -31,7 +31,7 @@ def _load_schemas():
 
 def do_discover():
     raw_schemas = _load_schemas()
-    streams = []
+    catalog_entries = []
 
     for stream_name, schema in raw_schemas.items():
         # create and add catalog entry
@@ -48,10 +48,10 @@ def do_discover():
             ),
             "key_properties": stream.key_properties,
         }
-        streams.append(catalog_entry)
+        catalog_entries.append(catalog_entry)
 
-    return Catalog.from_dict({"streams": streams})
-    
+    return Catalog.from_dict({"streams": catalog_entries})
+
 
 def do_sync():
     LOGGER.warning("Sync not implemented")
@@ -62,10 +62,10 @@ def main():
     required_config_keys = ['start_date']
     args = singer.parse_args(required_config_keys)
 
-    config = args.config
+    config = args.config  # pylint:disable=unused-variable
 #    client = Client(config)
     catalog = args.catalog or Catalog([])
-    state = args.state
+    state = args.state # pylint:disable=unused-variable
 
     if args.properties and not args.catalog:
         raise Exception("DEPRECATED: Use of the 'properties' parameter is not supported. Please use --catalog instead")
