@@ -34,11 +34,9 @@ jobs:
 workflows:
   version: 2
   commit:
-    context: circleci-user
     jobs:
       - build
   build_daily:
-    context: circleci-user
     triggers:
       - schedule:
           cron: "0 0 * * *"
