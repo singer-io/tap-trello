@@ -1,7 +1,6 @@
 version: 2
 jobs:
   build:
-    context: circleci-user
     docker:
       - image: 218546966473.dkr.ecr.us-east-1.amazonaws.com/circle-ci:tap-tester-v4
     steps:
@@ -35,9 +34,11 @@ jobs:
 workflows:
   version: 2
   commit:
+    context: circleci-user
     jobs:
       - build
   build_daily:
+    context: circleci-user
     triggers:
       - schedule:
           cron: "0 0 * * *"
