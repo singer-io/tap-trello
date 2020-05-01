@@ -64,7 +64,7 @@ def main():
     args = singer.parse_args(required_config_keys)
 
     config = args.config  # pylint:disable=unused-variable
-    client = TrelloClient(config)
+    client = TrelloClient(config)  # pylint:disable=unused-variable
     catalog = args.catalog or Catalog([])
     state = args.state # pylint:disable=unused-variable
 
