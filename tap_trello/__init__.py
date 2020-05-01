@@ -5,6 +5,7 @@ import singer
 from singer import utils, metadata
 from singer.catalog import Catalog, write_catalog
 import tap_trello.streams as streams
+from tap_trello.client import TrelloClient
 
 LOGGER = singer.get_logger()
 
@@ -59,11 +60,11 @@ def do_sync():
 
 @utils.handle_top_exception(LOGGER)
 def main():
-    required_config_keys = ['start_date']
+    required_config_keys = ['start_date', 'consumer_key', 'consumer_secret', 'access_token', 'access_token_secret']
     args = singer.parse_args(required_config_keys)
 
     config = args.config  # pylint:disable=unused-variable
-#    client = Client(config)
+    client = TrelloClient(config)
     catalog = args.catalog or Catalog([])
     state = args.state # pylint:disable=unused-variable
 

@@ -12,6 +12,7 @@ setup(
     install_requires=[
         "singer-python==5.9.0",
         "requests==2.23.0",
+        "requests-oauthlib==1.3.0",
         "backoff==1.8.0"
     ],
     extras_require={
