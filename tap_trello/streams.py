@@ -11,3 +11,7 @@ class Foo(Stream):
     """
     Dummy class for discovery
     """
+
+
+
+STREAM_OBJECTS = {'foo': Foo}
