@@ -2,14 +2,11 @@ import singer
 from singer import utils
 from singer.catalog import Catalog, write_catalog
 from tap_trello.discover import do_discover
+from tap_trello.sync import do_sync
 import tap_trello.streams as streams
 from tap_trello.client import TrelloClient
 
 LOGGER = singer.get_logger()
-
-def do_sync():
-    LOGGER.warning("Sync not implemented")
-
 
 @utils.handle_top_exception(LOGGER)
 def main():
@@ -29,7 +26,7 @@ def main():
         catalog = do_discover()
         write_catalog(catalog)
     else:
-        do_sync()
+        do_sync(client, config, state, catalog)
 
 if __name__ == "__main__":
     main()
