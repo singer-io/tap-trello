@@ -89,15 +89,7 @@ class Boards(Stream):
             singer.write_state(self.state)
 
 
-class Foo(Stream):
-    """
-    Dummy class for discovery
-    """
-
-
-
 
 STREAM_OBJECTS = {
-    'foo': Foo,
     'boards': Boards
 }
