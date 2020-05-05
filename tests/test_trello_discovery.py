@@ -31,7 +31,7 @@ class TestTrelloDiscovery(unittest.TestCase):
 
     def expected_check_streams(self):
         return {
-            'foo'
+            'boards'
         }
 
     def tap_name(self):
@@ -60,4 +60,4 @@ class TestTrelloDiscovery(unittest.TestCase):
 
         diff = self.expected_check_streams().symmetric_difference(found_catalog_names)
         self.assertEqual(len(diff), 0, msg="discovered schemas do not match: {}".format(diff))
-        print("discovered schemas passed")
+        print("discovered schemas are OK")

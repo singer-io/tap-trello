@@ -1,6 +1,12 @@
 import requests
 from requests_oauthlib import OAuth1
 
+import singer
+
+LOGGER = singer.get_logger()
+
+ENDPOINT_BASE = "https://api.trello.com/1"
+
 class TrelloClient():
     def __init__(self, config):
         self.oauth = OAuth1(config['consumer_key'],
@@ -11,10 +17,21 @@ class TrelloClient():
         self.member_id = self._get_member_id()
 
     def _get_member_id(self):
-        return self.get('https://api.trello.com/1/members/me')['id']
+        return self.get('/members/me')['id']
 
-    def _make_request(self, method, url, headers=None, params=None):
-        response = requests.request(method, url, headers=headers, params=params, auth=self.oauth)
+    def _make_request(self, method, endpoint, headers=None, params=None):
+        full_url = ENDPOINT_BASE + endpoint
+        LOGGER.info(
+            "%s - Making request to %s endpoint %s, with params %s",
+            full_url,
+            method.upper(),
+            endpoint,
+            params,
+        )
+
+        response = requests.request(method, full_url, headers=headers, params=params, auth=self.oauth)
+
+        response.raise_for_status()
         # TODO: Check error status, rate limit, etc.
         return response.json()
 
