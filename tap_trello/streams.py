@@ -17,8 +17,13 @@ class Stream:
         self.state = state
 
 
-    def get_params(self):
+    def get_params(self): # pylint: disable=no-self-use
+        """ To be overriden in child. """
         return {}
+
+
+    def format_endpoint(self):
+        """ Abstract method, to be implemented in child. """
 
 
     def update_bookmark(self, bookmark_value):
@@ -48,7 +53,8 @@ class Stream:
         return records
 
 
-    def should_yield(self, _):
+    def should_yield(self, _): # pylint: disable=no-self-use
+        """ To be overridden in child, if parent not selected. (e.g., set `emit` = False on parent obj) """
         return True
 
 
