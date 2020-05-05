@@ -32,7 +32,8 @@ class TestTrelloDiscovery(unittest.TestCase):
     def expected_check_streams(self):
         return {
             'boards',
-            'users'
+            'users',
+            'lists'
         }
 
     def tap_name(self):
