@@ -1,5 +1,28 @@
 import singer
 
+class FullTable():
+    """
+    Mixin class to override Stream implementations for FullTable streams.
+    e.g.:
+        class MyStream(FullTable, Stream):
+            # Specify properties, implement unique things
+    """
+    replication_keys = []
+    replication_method = "FULL_TABLE"
+
+    def update_bookmark(self, bookmark_value):
+        """Defines the stream as non-bookmarkable"""
+
+class Unsortable():
+    """
+    Mixin class to override Stream implementations for FullTable streams.
+    e.g.:
+        class MyStream(Unsortable, Stream):
+            # Specify properties, implement unique things
+    """
+    def check_order(self, current_bookmark_value):
+        """Defines this stream as not sortable """
+
 
 class Stream:
     stream_id = None
@@ -8,7 +31,7 @@ class Stream:
     endpoint = None
     key_properties = ["id"]
     replication_keys = []
-    replication_method = None
+    replication_method = "INCREMENTAL" # Default, override with "FullTable" mixin
     _last_bookmark_value = None
 
     def __init__(self, client, config, state):
@@ -22,8 +45,11 @@ class Stream:
         return {}
 
 
-    def format_endpoint(self):
-        """ Abstract method, to be implemented in child. """
+    def get_format_values(self):
+        return []
+
+    def format_endpoint(self, format_values):
+        return self.endpoint.format(*format_values)
 
 
     def update_bookmark(self, bookmark_value):
@@ -47,8 +73,8 @@ class Stream:
         self._last_bookmark_value = current_bookmark_value
 
 
-    def get_records(self):
-        records = self.client.get(self.format_endpoint(), **self.get_params())
+    def get_records(self, format_values):
+        records = self.client.get(self.format_endpoint(format_values), **self.get_params())
 
         return records
 
@@ -59,7 +85,7 @@ class Stream:
 
 
     def sync(self):
-        for rec in self.get_records():
+        for rec in self.get_records(self.get_format_values()):
             current_bookmark_value = rec[self.replication_keys[0]]
             self.check_order(current_bookmark_value)
             self.update_bookmark(current_bookmark_value)
@@ -67,20 +93,39 @@ class Stream:
                 yield rec
 
 
-class Boards(Stream):
+class ChildStream(Stream):
+    parent_class = None
+
+    def get_parent_ids(self, parent):
+        # Will request for IDs of parent stream (boards currently)
+        # and yield them to be used in child's sync
+        # TODO: Can we filter on id for the Boards call?
+        for parent_obj in parent.get_records(parent.get_format_values()):
+            yield parent_obj['id']
+
+    # TODO: If we need second-level child streams, most of sync needs pulled into get_records for this class
+
+    def sync(self):
+        parent = self.parent_class(self.client, self.config, self.state)
+        for parent_id in self.get_parent_ids(parent):
+            # Get users for "parent_id" (aka board_id)
+            for rec in self.get_records([parent_id]):
+                if self.replication_keys:
+                    current_bookmark_value = rec[self.replication_keys[0]]
+                    self.check_order(current_bookmark_value)
+                    self.update_bookmark(current_bookmark_value)
+                if self.should_yield(rec):
+                    yield rec
+
+
+
+class Boards(Unsortable, Stream):
     stream_id = "boards"
     stream_name = "boards"
     data_key = None
     endpoint = "/members/{}/boards"
     key_properties = ["id"]
     replication_keys = ["dateLastActivity"]
-    replication_method = "INCREMENTAL"
-
-    def check_order(self, current_bookmark_value):
-        """Boards is not sortable"""
-
-    def format_endpoint(self):
-        return self.endpoint.format(self.client.member_id)
 
     def should_yield(self, rec):
         current_state_value = singer.bookmarks.get_bookmark(self.state, self.stream_name, self.replication_keys[0])
@@ -94,8 +139,23 @@ class Boards(Stream):
             )
             singer.write_state(self.state)
 
+    def get_format_values(self):
+        return [self.client.member_id]
+
+
+class Users(FullTable, Unsortable, ChildStream):
+    # TODO: If a user is added to a board, does the board's dateLastActivity get updated?
+    # TODO: Should this assoc the board_id to the user records? Seems pretty useless without it
+    stream_id = "users"
+    stream_name = "users"
+    data_key = None
+    endpoint = "/boards/{}/members"
+    key_properties = ["id"]
+    parent_class = Boards
+
 
 
 STREAM_OBJECTS = {
-    'boards': Boards
+    'boards': Boards,
+    'users': Users
 }
