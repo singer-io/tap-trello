@@ -42,7 +42,7 @@ class Stream:
         return {}
 
 
-    def get_format_values(self):
+    def get_format_values(self): # pylint: disable=no-self-use
         return []
 
     def _format_endpoint(self, format_values):
@@ -88,9 +88,9 @@ class Stream:
 
 
 class ChildStream(Stream):
-    parent_class = None
+    parent_class = Stream
 
-    def get_parent_ids(self, parent):
+    def get_parent_ids(self, parent): # pylint: disable=no-self-use
         # Will request for IDs of parent stream (boards currently)
         # and yield them to be used in child's sync
         for parent_obj in parent.get_records(parent.get_format_values(), params={"fields": "id"}):
