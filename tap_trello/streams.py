@@ -24,7 +24,6 @@ class Unsortable():
 class Stream:
     stream_id = None
     stream_name = None
-    data_key = None
     endpoint = None
     key_properties = ["id"]
     replication_keys = []
@@ -112,9 +111,9 @@ class ChildStream(Stream):
 
 
 class Boards(NonBookmarked, Unsortable, Stream):
+    # TODO: Should boards respect the start date? i.e., not emit records from before the configured start?
     stream_id = "boards"
     stream_name = "boards"
-    data_key = None
     endpoint = "/members/{}/boards"
     key_properties = ["id"]
     replication_keys = []
@@ -130,8 +129,18 @@ class Users(NonBookmarked, Unsortable, ChildStream):
     # TODO: Should this assoc the board_id to the user records? Seems pretty useless without it
     stream_id = "users"
     stream_name = "users"
-    data_key = None
     endpoint = "/boards/{}/members"
+    key_properties = ["id"]
+    replication_keys = []
+    replication_method = "FULL_TABLE"
+    parent_class = Boards
+
+
+class Lists(NonBookmarked, Unsortable, ChildStream):
+    # TODO: If a list is added to a board, does the board's dateLastActivity get updated?
+    stream_id = "lists"
+    stream_name = "lists"
+    endpoint = "/boards/{}/lists"
     key_properties = ["id"]
     replication_keys = []
     replication_method = "FULL_TABLE"
@@ -141,5 +150,5 @@ class Users(NonBookmarked, Unsortable, ChildStream):
 
 STREAM_OBJECTS = {
     'boards': Boards,
-    'users': Users
-}
+    'users': Users,
+    'lists': Lists}

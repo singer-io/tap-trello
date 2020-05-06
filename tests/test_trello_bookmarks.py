@@ -33,13 +33,15 @@ class TrelloBookmarks(unittest.TestCase):
     def expected_check_streams(self):
         return {
             'boards',
-            'users'
+            'users',
+            'lists'
         }
 
     def expected_sync_streams(self):
         return {
             'boards',
-            'users'
+            'users',
+            'lists'
         }
 
     def tap_name(self):
@@ -48,7 +50,8 @@ class TrelloBookmarks(unittest.TestCase):
     def expected_pks(self):
         return {
             "boards" : {"id"},
-            "users" : {"id"}
+            "users" : {"id"},
+            "lists" : {"id"}
         }
 
     def expected_automatic_fields(self):
