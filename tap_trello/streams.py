@@ -36,11 +36,6 @@ class Stream:
         self.state = state
 
 
-    def get_params(self): # pylint: disable=no-self-use
-        """ To be overriden in child. """
-        return {}
-
-
     def get_format_values(self): # pylint: disable=no-self-use
         return []
 
@@ -48,41 +43,16 @@ class Stream:
         return self.endpoint.format(*format_values)
 
 
-    def update_bookmark(self, bookmark_value):
-        singer.bookmarks.write_bookmark(
-            self.state, self.stream_name, self.replication_keys[0], bookmark_value
-        )
-        singer.write_state(self.state)
-
-
-    def check_order(self, current_bookmark_value):
-        if self._last_bookmark_value is None:
-            self._last_bookmark_value = current_bookmark_value
-
-        if current_bookmark_value < self._last_bookmark_value:
-            raise Exception(
-                "Detected out of order data. Current bookmark value {} is less than last bookmark value {}".format(
-                    current_bookmark_value, self._last_bookmark_value
-                )
-            )
-
-        self._last_bookmark_value = current_bookmark_value
-
-
     def get_records(self, format_values, params=None):
         if params is None:
             params = {}
-        records = self.client.get(self._format_endpoint(format_values), {**self.get_params(), **params})
+        records = self.client.get(self._format_endpoint(format_values), params=params)
 
         return records
 
 
     def sync(self):
         for rec in self.get_records(self.get_format_values()):
-            if self.replication_keys:
-                current_bookmark_value = rec[self.replication_keys[0]]
-                self.check_order(current_bookmark_value)
-                self.update_bookmark(current_bookmark_value)
             yield rec
 
 
@@ -102,21 +72,16 @@ class ChildStream(Stream):
         for parent_id in self.get_parent_ids(parent):
             # Get users for "parent_id" (aka board_id)
             for rec in self.get_records([parent_id]):
-                if self.replication_keys:
-                    current_bookmark_value = rec[self.replication_keys[0]]
-                    self.check_order(current_bookmark_value)
-                    self.update_bookmark(current_bookmark_value)
                 yield rec
 
 
 
-class Boards(NonBookmarked, Unsortable, Stream):
+class Boards(Unsortable, Stream):
     # TODO: Should boards respect the start date? i.e., not emit records from before the configured start?
     stream_id = "boards"
     stream_name = "boards"
     endpoint = "/members/{}/boards"
     key_properties = ["id"]
-    replication_keys = []
     replication_method = "FULL_TABLE"
 
 
@@ -124,25 +89,23 @@ class Boards(NonBookmarked, Unsortable, Stream):
         return [self.client.member_id]
 
 
-class Users(NonBookmarked, Unsortable, ChildStream):
+class Users(Unsortable, ChildStream):
     # TODO: If a user is added to a board, does the board's dateLastActivity get updated?
     # TODO: Should this assoc the board_id to the user records? Seems pretty useless without it
     stream_id = "users"
     stream_name = "users"
     endpoint = "/boards/{}/members"
     key_properties = ["id"]
-    replication_keys = []
     replication_method = "FULL_TABLE"
     parent_class = Boards
 
 
-class Lists(NonBookmarked, Unsortable, ChildStream):
+class Lists(Unsortable, ChildStream):
     # TODO: If a list is added to a board, does the board's dateLastActivity get updated?
     stream_id = "lists"
     stream_name = "lists"
     endpoint = "/boards/{}/lists"
     key_properties = ["id"]
-    replication_keys = []
     replication_method = "FULL_TABLE"
     parent_class = Boards
 
