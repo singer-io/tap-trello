@@ -7,12 +7,8 @@ import json
 import requests
 import logging
 from datetime import datetime as dt
+from enum import Enum
 
-def get_credentials(self):
-    return {
-        'testing_key': os.getenv('TAP_TRELLO_CONSUMER_KEY'),
-        'testing_token': os.getenv('TAP_TRELLO_TESTING_TOKEN')
-    }
 
 BASE_URL = "https://api.trello.com/1"
 HEADERS = {
