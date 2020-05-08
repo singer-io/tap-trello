@@ -1,6 +1,4 @@
-"""
-Harvest API Response, Access Token and Refresh Token
-"""
+""" Trello API utils for retrieving, and manipulating test data """
 
 import os
 import json
@@ -18,21 +16,24 @@ HEADERS = {
 }
 PARAMS = (
     ('key', '{}'.format(os.getenv('TAP_TRELLO_CONSUMER_KEY'))),
-    ('token', '{}'.format(os.getenv('TAP_TRELLO_SERVER_TOKEN')))
+    ('token', '{}'.format(os.getenv('TAP_TRELLO_SERVER_TOKEN'))),
+    ('since', '2020-03-01T00:00:00Z')
 )
 
+#('since', '{}'.format(dt.utcnow()))
 
 ##########################################################################
 ### Utils for retrieving existing test data 
 ##########################################################################
-def get_objects(obj_type: str, obj_id: str = ""):
+def get_objects(obj_type: str, obj_id: str = "", parent_id: str = ""):
     """
     get all objects for a given object
     -  or -
     get a specific obj by id
-    """
-    print("Running a GET on /{}/{}".format(obj_type, obj_id))
-    resp = requests.get(url=get_url_string("get", obj_type, obj_id), headers=HEADERS, params=PARAMS)
+   """
+    print(" * Test Data |  Request: GET on /{}/{}".format(obj_type, obj_id))
+    endpoint = get_url_string("get", obj_type, obj_id, parent_id)
+    resp = requests.get(url=endpoint, headers=HEADERS, params=PARAMS)
 
     if resp.status_code >= 400:
         logging.warn("Request Failed {} \n    {}".format(resp.status_code, resp.text))
@@ -49,84 +50,150 @@ def get_random_object_id(obj_type: str):
     return random_object.get('id')
 
 
-def get_url_string(req: str, obj_type: str, obj_id: str = ""):
-    """"""
+def get_url_string(req: str, obj_type: str, obj_id: str = "", parent_id: str = ""):
+    """
+    Form the endpoint for a request based on the following:
+     :param req: Type of request, oneOf['get', 'post', 'delete'].
+     :param obj_type: The stream you are making the reqest on.
+     :param obj_id: The specific id of a record in the stream you are making a request on.
+     :param parent_id: The specific id of a record that is the parent of the stream you are making a request on.
+                       If you do not specific a parent id, a random one will be selected if needed
+    eg. 
+    Get all actions for a given baord:
+        get_url_string(req='get', obj_type='actions', obj_id='', parent_id=<id-of-a-specific-board>)
+    Create a card anywhere:
+        get_url_string(req='post', obj_type='cards', obj_id='', parent_id='')
+    """
+    
     url_string = BASE_URL
 
-    if obj_type == 'boards':
+    if obj_type == 'boards': # TODO may need to parameterize a members parent obj here
         if req == "get":
             url_string += "/members/me/{}/{}".format(obj_type, obj_id)
         else:
             url_string += "/{}/{}".format(obj_type, obj_id)
         return url_string
 
-    random_board_id = get_random_object_id('boards') # Needed for accessing nested structure
-    # TODO will need a get all objects method regardless of top level object....
+    if not parent_id: # Needed for accessing nested structure
+        parent_id = get_random_object_id('boards')
+    # TODO may need to add a 'parent_obj' param if we don't want to use baords
 
     if obj_type == 'users':
-        url_string += "/boards/{}/members/{}".format(random_board_id, obj_id)
+        url_string += "/boards/{}/members/{}".format(parent_id, obj_id)
+
+    elif obj_type == 'actions':
+        url_string += "/boards/{}/actions/{}".format(parent_id, obj_id)
 
     elif obj_type == 'cards':
         if req == "get":
-            url_string += "/boards/{}/cards/{}".format(random_board_id, obj_id)
+            url_string += "/boards/{}/cards/{}".format(parent_id, obj_id)
         else:
             url_string += "/cards/{}".format(obj_id)
+
     elif obj_type == 'lists':
-        url_string += "/boards/{}/lists/{}".format(random_board_id, obj_id)
+        url_string += "/boards/{}/lists/{}".format(parent_id, obj_id)
 
     else:
         raise NotImplementedError
 
     return url_string
 
+
 ##########################################################################
 ### Test Data
 ##########################################################################
-tstamp = dt.utcnow().timestamp() # this is used to genereate unique data
+tstamp = dt.utcnow().timestamp() # this is used to genereate unique dat
+print(" * Test Data | INITIALIZING tstamp to {}".format(tstamp))
 
-class TestData(Enum):
-    BOARDS = { "name": "Test Board {}".format(tstamp)}
-    USERS = ""  # {"fullName":"xae a12","username":"singersongwriterd42"}
-    CARDS = {
-        "name":"Card {}".format(tstamp),
-        "desc": "This is a description.",
-        "pos": "{}".format(random.choice(["top", "bottom", random.randint(1,20)])),  # card position [top,bottom,positive float]
-        "due": "{}".format((dt.today() + timedelta(days=5)).date()),  # A due date for the card (Format: date)
-        "dueComplete": random.choice([True, False]),  # boolean
-        "idList": "{}".format(get_random_object_id('lists')),  # REQUIRED ID of list card is created in ^[0-9a-fA-F]{32}$
-        "idMembers": [], # Array<string> comma-separated list of member IDs to add to the card
-        "idLabels": [],# Array<string> Comma-separated list of label IDs to add to the card
-        "urlSource": "", # A URL starting with http:// or https:// Format: url
-        "fileSource": "", # Format: binary
-        "idCardSource": "",#"{}".format(get_random_object_id('cards')), # The ID of a card to copy into the new card Pattern: ^[0-9a-fA-F]{32}$
-        "address": "", # For use with/by the Map Power-Up
-        "locationName": "", #For use with/by the Map Power-Up
-        "coordinates": "", # For use with/by the Map Power-Up. Should take the form latitude,longitude
-        "keepFromSource": "string", # If using idCardSource you can specify which properties to copy over. all or comma-separated list of: attachments,checklists,comments,due,labels,members,stickers. Style: form, Default: all. Valid values: all, attachments, checklists, comments, due, labels, members, stickers
+def get_test_data():
+    global tstamp
+    tstamp = dt.utcnow().timestamp() # this is used to genereate unique data
+
+    TEST_DATA = {
+        "BOARDS": {"name": "Test Board {}".format(tstamp)},
+        "USERS": "",  # TODO {"fullName":"xae a12","username":"singersongwriterd42"}
+        "CARDS": {
+            "name":"Card {}".format(tstamp),
+            "desc": "This is a description.",
+            "pos": "{}".format(random.choice(["top", "bottom", random.randint(1,20)])),  # card pos [top,bottom,positive float]
+            "due": "{}".format((dt.today() + timedelta(days=5)).date()),  # A due date for the card (Format: date)
+            "dueComplete": random.choice([True, False]),  # boolean
+            "idList": "{}".format(get_random_object_id('lists')),  # REQUIRED ID of list card is created in ^[0-9a-fA-F]{32}$
+            "idMembers": [], # Array<string> comma-separated list of member IDs to add to the card
+            "idLabels": [],# Array<string> Comma-separated list of label IDs to add to the card
+            "urlSource": "", # A URL starting with http:// or https:// Format: url
+            "fileSource": "", # Format: binary
+            "idCardSource": "",#"{}".format(get_random_object_id('cards')), # ID of card to copy into new card ^[0-9a-fA-F]{32}$
+            "address": "", # For use with/by the Map Power-Up
+            "locationName": "", #For use with/by the Map Power-Up
+            "coordinates": "", # For use with/by the Map Power-Up. Should take the form latitude,longitude
+            "keepFromSource": "string", # If using idCardSource you can specify which properties to copy over. all or comma-separated list of: attachments,checklists,comments,due,labels,members,stickers. Style: form, Default: all. Valid values: all, attachments, checklists, comments, due, labels, members, stickers
+        },
+        "LISTS" : ""
     }
-    LISTS = ""
+
+    return TEST_DATA
+
+
+##########################################################################
+### Utils for updating existing test data
+##########################################################################
+def update_object(obj_type: str, obj_id: str = '', parent_id: str = '', field_to_update: str = 'name'):
+    """
+    update an existing object in order to genereate a new 'actions' record
+    """
+    print(" * Test Data | Request: PUT on /{}/".format(obj_type))
+
+    if not obj_id:
+        obj_id = get_random_object_id(obj_type)
+    
+    data = stream_to_data_mapping(obj_type)
+    if data:
+        data_to_update = {field_to_update: data.get(field_to_update)} # just change the name
+        endpoint = get_url_string("put", obj_type, obj_id, parent_id)
+        print(" * Test Data | Changing: {} ".format(data_to_update))
+        resp = requests.put(url=endpoint, headers=HEADERS, params=PARAMS, json=data_to_update)
+        if resp.status_code >= 400:
+            logging.warn("Request Failed {} \n    {}".format(resp.status_code, resp.text))
+            return resp
+
+        return resp.json()
+
+    raise NotImplementedError
 
 
 ##########################################################################
 ### Utils for creating new test data
 ##########################################################################
-stream_to_data_mapping = {
-    "boards": TestData.BOARDS,
-    "users": TestData.USERS,
-    "lists": TestData.LISTS,
-    "cards": TestData.CARDS,
-}
-def create_object(obj_type):
+def stream_to_data_mapping(stream):
+    data = get_test_data()
+    mapping = {
+        'actions': "BOARDS", # random.choice(data) TODO
+        "boards": "BOARDS",
+        "cards": "CARDS",
+        "lists": "LISTS",
+        "users": "USERS",
+    }
+    return data[mapping[stream]]
+
+
+def create_object(obj_type, obj_id: str = "", parent_id: str = ""):
     """
-    create a single record for a given object
+    Create a single record for a given object
+
+    To create an actions record, we will call update for another object stream
+
     return that object or none if create fails
     """
-    print("Running a POST on /{}/".format(obj_type))
-    # Update the current timestamp to ensure record is unique
-    tstamp = dt.utcnow().timestamp()
-    data = stream_to_data_mapping[obj_type].value
+    if obj_type == 'actions':
+        return update_object('boards', obj_id, parent_id)
+
+    print(" * Test Data | Request: POST on /{}/".format(obj_type))
+
+    data = stream_to_data_mapping(obj_type)
     if data:    
-        resp = requests.post(url=get_url_string("post", obj_type), headers=HEADERS, params=PARAMS, json=data)
+        endpoint = get_url_string("post", obj_type)
+        resp = requests.post(url=endpoint, headers=HEADERS, params=PARAMS, json=data)
         if resp.status_code >= 400:
             logging.warn("Request Failed {} \n    {}".format(resp.status_code, resp.text))
             return resp
@@ -139,22 +206,69 @@ def create_object(obj_type):
 ##########################################################################
 ### Testing the utils above
 ##########################################################################
-stream = 'cards'
-# existing_obj = get_objects(stream)
-# print(existing_obj)
-new_obj = create_object(obj_type=stream)
-print(new_obj)
-existing_obj = get_objects(obj_type=stream)
-print(existing_obj)
 
+# all_boards = get_objects(obj_type='boards')
+# print(all_boards)
+# print("THERE ARE {} {}".format(len(all_boards), 'boards'))
+# count = 0
+# for board in all_boards:
+#     existing_obj = get_objects(obj_type=stream, parent_id=board.get('id'))
+#     count += len(existing_obj)
+# print("THERE ARE {} {}".format(count, stream))
+
+# new_obj = create_object(obj_type=stream)
+# print(new_obj)
+# new_obj = create_object(obj_type=stream)
+# print(new_obj)
+
+# all_boards = get_objects(obj_type='boards')
+# print("THERE ARE {} {}".format(len(all_boards), 'boards'))
+# count = 0
+# for board in all_boards:
+#     existing_obj = get_objects(obj_type=stream, parent_id=board.get('id'))
+#     count += len(existing_obj)
+#     print(board.get('name'))
+# print("THERE ARE {} {}".format(count, stream))
 
 # existing_obj = get_objects(obj_type='actions')
 # print(existing_obj.text)
 # data = { "name": "Test Board {}".format(dt.utcnow().timestamp())}
 
-# new_obj = create_object(obj_type='boards', data=data)
-
 # if new_obj:
 #     print("I created an object: \n{}".format(new_obj.text))
 
 # record = {"id":"5eb2193393a06a2d30f3e3fc","idMemberCreator":"5ea9e34cbc3f72317f964c45","data":{"creationMethod":"automatic","board":{"id":"5eb2193393a06a2d30f3e3f7","name":"Test Board 1588744562.556537","shortLink":"ceATiT4r"}},"type":"createBoard","date":"2020-05-06T01:56:03.030Z","limits":{},"memberCreator":{"id":"5ea9e34cbc3f72317f964c45","username":"singersongwriter3","activityBlocked":false,"avatarHash":null,"avatarUrl":null,"fullName":"Singer Songwriter","idMemberReferrer":null,"initials":"SS","nonPublic":{},"nonPublicAvailable":false}}
+if __name__ == "__main__":
+    Testing = False
+    if Testing:
+        print("Testing basic functions of utils")
+
+        for obj in ['boards', 'actions']:
+            print("Testing function: create_object using stream {}".format(obj))
+            created_obj = create_object(obj)
+            if created_obj:
+                print("SUCCESS")
+                continue
+            print("FAILED")
+
+        for obj in ['boards']:
+            print("Testing function: update_object using stream {}".format(obj))
+            updated_obj = update_object(obj)
+            if created_obj:
+                print("SUCCESS")
+                continue
+            print("FAILED")
+
+        for obj in ['boards', 'actions']:
+            print("Testing function: update_object using stream {}".format(obj))
+            existing_objs = get_objects(obj)
+            if existing_objs:
+                print("SUCCESS")
+                continue
+            print("FAILED")
+    stream = 'actions'
+    existing_obj = get_objects(obj_type=stream)
+    print(len(existing_obj))
+
+    print(existing_obj)
+    
