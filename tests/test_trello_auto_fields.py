@@ -38,7 +38,9 @@ class TestTrelloAutomaticFields(unittest.TestCase):
 
     def testable_streams(self): # TODO rip this once all streams testable
         return {
-            'boards'
+            'boards',
+            'users',
+            'lists'
         }
     def expected_check_streams(self):
         return {
@@ -73,6 +75,39 @@ class TestTrelloAutomaticFields(unittest.TestCase):
             'start_date' : '2020-03-01T00:00:00Z'
         }
 
+    def get_parent_stream(self):
+        return {
+            "boards": "boards",
+            "users": "boards",
+            "lists": "boards"
+        }
+
+    def get_total_record_count_and_objects(self, parent_stream: str, child_stream: str):
+        """Return the count and all records of a given child stream"""
+        parent_objects = utils.get_objects(obj_type=parent_stream)
+
+        # If true, then this stream is top level so just need 1 get ^
+        if parent_stream == child_stream:
+            return len(parent_objects), parent_objects
+
+        count = 0
+        existing_objects = []
+
+        for obj in parent_objects:
+            objects = utils.get_objects(obj_type=child_stream, parent_id=obj.get('id'))
+            for obj in objects:
+                already_tracked = False
+                for e_obj in existing_objects:
+                    if obj['id'] == e_obj['id']:
+                        already_tracked = True
+                        break
+                if not already_tracked:
+                    existing_objects.append(obj)
+
+            count += len(objects)
+
+        return count, existing_objects
+
     def test_run(self):
         """
         Verify that for each stream you can get multiple pages of data
@@ -86,8 +121,10 @@ class TestTrelloAutomaticFields(unittest.TestCase):
         # ensure data exists for sync streams and set expectations
         expected_records = {x: [] for x in self.expected_sync_streams()} # ids by stream
         #for stream in self.get_expected_sync_streams():
-        for stream in ['boards']:
-            existing_objects = utils.get_objects(stream)
+        for stream in self.testable_streams():
+            parent_stream = self.get_parent_stream().get(stream)
+            _, existing_objects = self.get_total_record_count_and_objects(parent_stream, stream)
+
             if existing_objects:
                 logging.info("Data exists for stream: {}".format(stream))
                 for obj in existing_objects:
@@ -162,25 +199,24 @@ class TestTrelloAutomaticFields(unittest.TestCase):
             self.assertGreater(count, 0, msg="failed to replicate any data for: {}".format(stream))
         print("total replicated row count: {}".format(replicated_row_count))
 
-        # Verify that ONLY automatic fields are emitted given no fields were selected for replication
-        for stream_name, data in synced_records.items():
-            record_messages_keys = [set(row['data'].keys()) for row in data['messages']]
-            expected_keys = self.expected_automatic_fields().get(stream_name)
 
-            # verify by keys
-            for actual_keys in record_messages_keys:
-                if stream_name in self.testable_streams(): # TODO rip this once all streams testable
+        for stream in self.testable_streams():
+            with self.subTest(stream=stream):
+
+                # Verify that ONLY automatic fields are emitted given no fields were selected for replication
+                data = synced_records.get(stream)
+                record_messages_keys = [set(row['data'].keys()) for row in data['messages']]
+                expected_keys = self.expected_automatic_fields().get(stream)
+
+                # verify by keys
+                for actual_keys in record_messages_keys:
                     self.assertEqual(
                         actual_keys.symmetric_difference(expected_keys), set(),
                         msg="Expected automatic fields and nothing else.")
                     continue
-                # if stream not yet testable ensure auto fields are at least in the record
-                self.assertEqual(expected_keys - actual_keys, set(),
-                                 msg="We should be replicating automatic fields but are not.")
-            
-            # verify by values
-            actual_records = [row['data'] for row in data['messages']]
-            if stream_name in self.testable_streams(): # TODO rip this once all streams testable
-                self.assertEqual(expected_records[stream_name],
+
+                # verify by values # TODO this assertion may be invalid for 'users'
+                actual_records = [row['data'] for row in data['messages']]
+                self.assertEqual(expected_records[stream],
                                  actual_records,
                                  msg="Actual values do match expectations")

@@ -91,8 +91,10 @@ def get_url_string(req: str, obj_type: str, obj_id: str = "", parent_id: str = "
             url_string += "/cards/{}".format(obj_id)
 
     elif obj_type == 'lists':
-        url_string += "/boards/{}/lists/{}".format(parent_id, obj_id)
-
+        if req == 'get':
+            url_string += "/boards/{}/lists".format(parent_id)
+        else:
+            url_string += "/lists/{}".format(obj_id)
     else:
         raise NotImplementedError
 
@@ -129,7 +131,13 @@ def get_test_data():
             "coordinates": "", # For use with/by the Map Power-Up. Should take the form latitude,longitude
             "keepFromSource": "string", # If using idCardSource you can specify which properties to copy over. all or comma-separated list of: attachments,checklists,comments,due,labels,members,stickers. Style: form, Default: all. Valid values: all, attachments, checklists, comments, due, labels, members, stickers
         },
-        "LISTS" : ""
+        "LISTS" : {
+            "name":"Card {}".format(tstamp),
+            "idBoard": "{}".format(get_random_object_id('boards')),  # The long ID of the board the list should be created on
+            "idListSource":"",  # ID of the List to copy into the new List
+            "pos": "{}".format(random.choice(["top", "bottom", random.randint(1,20)])),  # card pos [top,bottom,positive float]
+
+        }
     }
 
     return TEST_DATA
@@ -207,35 +215,35 @@ def create_object(obj_type, obj_id: str = "", parent_id: str = ""):
 ### Testing the utils above
 ##########################################################################
 if __name__ == "__main__":
-    Testing = False
-    if Testing:
-        print("Testing basic functions of utils")
+    test_creates = False
+    test_updates = False
+    test_gets = True
 
-        for obj in ['boards', 'actions']:
-            print("Testing function: create_object using stream {}".format(obj))
+    objects_to_test = ['actions', 'cards', 'lists'] #'boards'
+
+    print("********** Testing basic functions of utils **********")
+    if test_creates:
+        for obj in objects_to_test:
+            print("Testing CREATE: {}".format(obj))
             created_obj = create_object(obj)
             if created_obj:
                 print("SUCCESS")
                 continue
             print("FAILED")
-
-        for obj in ['boards']:
-            print("Testing function: update_object using stream {}".format(obj))
+    if test_updates:
+        for obj in objects_to_test:
+            print("Testing UPDATE: {}".format(obj))
             updated_obj = update_object(obj)
             if created_obj:
                 print("SUCCESS")
                 continue
             print("FAILED")
-
-        for obj in ['boards', 'actions']:
-            print("Testing function: update_object using stream {}".format(obj))
+    if test_gets:
+        for obj in objects_to_test:
+            print("Testing GET: {}".format(obj))
             existing_objs = get_objects(obj)
             if existing_objs:
                 print("SUCCESS")
                 continue
             print("FAILED")
-    stream = 'actions'
-    existing_obj = get_objects(obj_type=stream)
-    print(len(existing_obj))
 
-    print(existing_obj)
