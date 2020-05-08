@@ -72,12 +72,13 @@ class DateWindowPaginated(Mixin):
     """
     Mixin class to provide date windowing on the `get_records` requests
     """
-    sync_start = None
     def _get_window_state(self):
         window_state = {}
 
         start_date = self.config['start_date']
-        window_start_bookmark = singer.get_bookmark(self.state, self.stream_id, 'window_start') or start_date
+        window_start_bookmark = (singer.get_bookmark(self.state, self.stream_id, 'window_start') or
+                                 singer.get_bookmark(self.state, self.stream_id, 'last_sync_end') or
+                                 start_date)
         window_start = utils.strptime_to_utc(max(window_start_bookmark, start_date))
 
         window_sub_end = singer.get_bookmark(self.state, self.stream_id, 'window_sub_end')
@@ -93,20 +94,24 @@ class DateWindowPaginated(Mixin):
 
         return window_start, window_sub_end, next_window_start
 
-    def sync_started(self):
-        # Create a sync_start value here, store in state
+    def on_sync_started(self):
+        # Hook from `sync` implementer: Save when we started the overall sync, to use as a bookmark, later
+        now = utils.strftime(utils.now())
+        singer.write_bookmark(self.state, self.stream_id, "sync_end", min(self.config.get('end_date', now), now))
+        singer.write_state(self.state)
     
-    def sync_finished(self):
+    def on_sync_finished(self):
         # Upgrade sync_start to a bookmark here to be used next time through to override `start_date`.
+        last_sync_end = singer.get_bookmark(self.state, self.stream_id, "sync_end")
+        singer.write_bookmark(self.state, self.stream_id, "last_sync_end", last_sync_end)
+        singer.clear_bookmark(self.state, self.stream_id, "sync_end")
+        singer.write_state(self.state)
 
-    
     def get_records(self, format_values, params=None):
         """ Overrides the default get_records to provide date_window pagination and bookmarking. """
-        # TODO: Pre-task to check if there is a "now" written already and use the min?
         if params is None:
             params = {}
 
-        self.sync_start = utils.strptime(singer.get_bookmark(self.state, self.stream_id, 'sync_start', utils.strftime(utils.now())))
         window_start, window_sub_end, next_window_start = self._get_window_state()
         window_start -= timedelta(milliseconds=1) # To make start inclusive
 
@@ -120,18 +125,14 @@ class DateWindowPaginated(Mixin):
         # next_window_start indicates we resumed a sync, if not present, then we use window_start
         next_window_start = next_window_start or window_start
 
-        now = utils.strftime(self.sync_start)
-        next_window_end = utils.strptime_to_utc(min(self.config.get('end_date', now), now))
+        # sync_end refers to the right-bound of our last window
+        sync_end = singer.get_bookmark(self.state, self.stream_id, "sync_end")
+        next_window_end = utils.strptime_to_utc(sync_end)
 
         self._update_bookmark("next_window_start", next_window_end)
 
         for rec in self._paginate_window(next_window_start, next_window_end, format_values, params):
             yield rec
-
-        # Set the final end to the next start
-        self._update_bookmark("window_start", next_window_end)
-        singer.bookmarks.clear_bookmark(self.state, self.stream_id, "next_window_start")
-        singer.write_state(self.state)
 
 
     def _update_bookmark(self, key, value):
@@ -166,7 +167,11 @@ class DateWindowPaginated(Mixin):
             else:
                 singer.bookmarks.clear_bookmark(self.state, self.stream_id, "window_start")
                 singer.bookmarks.clear_bookmark(self.state, self.stream_id, "window_sub_end")
-                singer.write_state(self.state)
+                singer.bookmarks.clear_bookmark(self.state, self.stream_id, "next_window_start")
+                LOGGER.info("%s - Finished syncing between %s and %s",
+                            self.stream_id,
+                            utils.strftime(window_start),
+                            singer.get_bookmark(self.state, self.stream_id, "next_window_start"))
                 break
 
 
@@ -222,17 +227,13 @@ class ChildStream(Stream):
         # - https://help.trello.com/article/759-getting-the-time-a-card-or-board-was-created
         parents = [{"id": x, "created": datetime.utcfromtimestamp(int(x[:8], 16))}
                    for x in parent_ids]
-        return sorted(parents, key=lamba x: x["created"])
+        return sorted(parents, key=lambda x: x["created"])
         
     # TODO: If we need second-level child streams, most of sync needs pulled into get_records for this class
 
     def sync(self):
+        self.on_sync_started()
         parent = self.parent_class(self.client, self.config, self.state)
-
-        # Ensure that start time of this stream's sync is bookmarked
-        sync_start = utils.strptime(singer.get_bookmark(self.state, self.stream_id, 'sync_start', utils.strftime(utils.now())))
-        singer.write_bookmark(self.state, self.stream_id, 'sync_start', utils.strftime(sync_start))
-        singer.write_state(self.state)
 
         # Get the most recent parent ID and resume from there, if necessary
         bookmarked_parent = singer.get_bookmark(self.state, self.stream_id, 'parent_id')
@@ -248,11 +249,12 @@ class ChildStream(Stream):
             # --- Add parent_id for next time
             # Clear all but sync_start and parent_id
             singer.write_bookmark(self.state, self.stream_id, "parent_id", parent_id)
+            singer.write_state(self.state)
             for rec in self.get_records([parent_id]):
                 yield rec
-        singer.clear_bookmark(self.state, self.stream_id, "sync_start")
         singer.clear_bookmark(self.state, self.stream_id, "parent_id")
-        self.sync_finished()
+        self.on_sync_finished()
+        singer.write_state(self.state)
         # -- Write child's bookmark to "now", maybe ask self what that means?
         # - e.g., self.write_bookmark_to_now() or something similar where we write the "earliest now that was written"
         # -- And remove the parent_id bookmark (we're done)
