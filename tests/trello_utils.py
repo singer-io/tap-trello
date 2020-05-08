@@ -186,7 +186,7 @@ def create_object(obj_type, obj_id: str = "", parent_id: str = ""):
     return that object or none if create fails
     """
     if obj_type == 'actions':
-        return update_object('boards', obj_id, parent_id)
+        return update_object('boards', obj_id=parent_id)
 
     print(" * Test Data | Request: POST on /{}/".format(obj_type))
 
@@ -206,38 +206,6 @@ def create_object(obj_type, obj_id: str = "", parent_id: str = ""):
 ##########################################################################
 ### Testing the utils above
 ##########################################################################
-
-# all_boards = get_objects(obj_type='boards')
-# print(all_boards)
-# print("THERE ARE {} {}".format(len(all_boards), 'boards'))
-# count = 0
-# for board in all_boards:
-#     existing_obj = get_objects(obj_type=stream, parent_id=board.get('id'))
-#     count += len(existing_obj)
-# print("THERE ARE {} {}".format(count, stream))
-
-# new_obj = create_object(obj_type=stream)
-# print(new_obj)
-# new_obj = create_object(obj_type=stream)
-# print(new_obj)
-
-# all_boards = get_objects(obj_type='boards')
-# print("THERE ARE {} {}".format(len(all_boards), 'boards'))
-# count = 0
-# for board in all_boards:
-#     existing_obj = get_objects(obj_type=stream, parent_id=board.get('id'))
-#     count += len(existing_obj)
-#     print(board.get('name'))
-# print("THERE ARE {} {}".format(count, stream))
-
-# existing_obj = get_objects(obj_type='actions')
-# print(existing_obj.text)
-# data = { "name": "Test Board {}".format(dt.utcnow().timestamp())}
-
-# if new_obj:
-#     print("I created an object: \n{}".format(new_obj.text))
-
-# record = {"id":"5eb2193393a06a2d30f3e3fc","idMemberCreator":"5ea9e34cbc3f72317f964c45","data":{"creationMethod":"automatic","board":{"id":"5eb2193393a06a2d30f3e3f7","name":"Test Board 1588744562.556537","shortLink":"ceATiT4r"}},"type":"createBoard","date":"2020-05-06T01:56:03.030Z","limits":{},"memberCreator":{"id":"5ea9e34cbc3f72317f964c45","username":"singersongwriter3","activityBlocked":false,"avatarHash":null,"avatarUrl":null,"fullName":"Singer Songwriter","idMemberReferrer":null,"initials":"SS","nonPublic":{},"nonPublicAvailable":false}}
 if __name__ == "__main__":
     Testing = False
     if Testing:
@@ -271,4 +239,3 @@ if __name__ == "__main__":
     print(len(existing_obj))
 
     print(existing_obj)
-    

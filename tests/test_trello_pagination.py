@@ -9,10 +9,10 @@ import logging
 from functools import reduce
 
 
-class TestTrelloAutomaticFields(unittest.TestCase):
-    """Test that with no fields selected for a stream automatic fields are still replicated"""
+class TestTrelloPagination(unittest.TestCase):
+    """Test that we are paginating for streams when exceeding the API record limit of a single query"""
 
-    API_LIMIT = 1000
+    API_LIMIT = 50
 
     def setUp(self):
         missing_envs = [x for x in [
@@ -79,16 +79,33 @@ class TestTrelloAutomaticFields(unittest.TestCase):
             'start_date' : '2020-03-01T00:00:00Z'
         }
 
-    def get_total_record_count(self, parent_stream: str, child_stream: str):
+    def get_total_record_count_and_objects(self, parent_stream: str, child_stream: str):
+        """Return the count and all records of a given child stream"""
         parent_objects = utils.get_objects(obj_type=parent_stream)
         count = 0
+        existing_objects = set()
 
         for obj in parent_objects:
-            logging.info("Getting {} via {} parent stream".format(child_stream, parent_stream))
-            existing_objects = utils.get_objects(obj_type=child_stream, parent_id=obj.get('id'))
-            count += len(existing_objects)
+            objects = utils.get_objects(obj_type=child_stream, parent_id=obj.get('id'))
+            existing_objects.update({obj['id'] for obj in objects})
+            count += len(objects)
+            print("{} {}".format(obj.get('name'), len(objects)))
 
-        return count
+        return count, existing_objects
+
+    def get_highest_record_count_and_parent_obj_id(self, parent_stream: str, child_stream: str):
+        """Return the parent object id with the largest record cound for child objects"""
+        parent_objects = utils.get_objects(obj_type=parent_stream)
+        return_object = ""
+        highest_count = 0
+
+        for obj in parent_objects:
+            objects = utils.get_objects(obj_type=child_stream, parent_id=obj.get('id'))
+            if len(objects) > highest_count:
+                highest_count = len(objects)
+                return_object = obj['id']
+
+        return highest_count, return_object
 
     def test_run(self):
         """
@@ -105,19 +122,16 @@ class TestTrelloAutomaticFields(unittest.TestCase):
         final_count = {x: 0 for x in self.expected_sync_streams()}
         for stream in self.testable_streams(): # just actions at the moment
             parent_stream = 'boards' # TODO Set somewhere as global
-            record_count = self.get_total_record_count(parent_stream, stream)
-            import pdb; pdb.set_trace()
+            record_count, parent_id = self.get_highest_record_count_and_parent_obj_id(parent_stream, stream)
             if record_count <= self.API_LIMIT:
                 logging.info("Not enough data to paginate : {} has {} records".format(stream, record_count))
-                parent_id = utils.get_random_object_id(parent_stream)
-
                 while record_count <= self.API_LIMIT:
-                    new_object = utils.create_object(obj_type=stream) #, obj_id=parent_id)
+                    new_object = utils.create_object(obj_type=stream, parent_id=parent_id)
                     record_count += 1
                     logging.info("Record Created: {} has {} records".format(stream, record_count))
                     # expected_records[stream].append(new_object['id'])
                     # NOTE: If we want exact records ^ will need to some work to find the action id that was just created
-                final_count[stream] = self.get_total_record_count(parent_stream, stream)
+                final_count[stream] = record_count
                 logging.info("FINAL RECORD COUNT: {} has {} records".format(stream, final_count[stream]))
                 continue
 
