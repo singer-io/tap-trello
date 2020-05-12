@@ -31,12 +31,12 @@ class OrderChecker:
             asc_desc = "ascending" if self.order == 'ASC' else "descending"
             gt_lt = "less than" if self.order == 'ASC' else "greater than"
             raise Exception(
-                "Detected out of order data. In {} sorted stream, current sorted " +
-                "value {} is {} last sorted value {}".format( # pylint: disable=too-many-format-args
-                    asc_desc,
-                    current_value,
-                    gt_lt,
-                    self._last_value)
+                ("Detected out of order data. In {} sorted stream, current sorted " +
+                 "value {} is {} last sorted value {}").format(
+                     asc_desc,
+                     current_value,
+                     gt_lt,
+                     self._last_value)
             )
 
         self._last_value = current_value
@@ -84,7 +84,6 @@ class DateWindowPaginated(Mixin):
     client = None
 
     def _get_window_state(self):
-        # TODO: add check to make sure start_date<=window_start<=window_sub_end<=window_end<=end_date
         window_start = singer.get_bookmark(self.state, self.stream_id, 'window_start')
         sub_window_end = singer.get_bookmark(self.state, self.stream_id, 'sub_window_end')
         window_end = singer.get_bookmark(self.state, self.stream_id, 'window_end')
