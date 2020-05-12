@@ -1,6 +1,6 @@
-import singer
 from datetime import datetime, timedelta
 from itertools import dropwhile
+import singer
 
 from singer import utils
 
@@ -32,7 +32,7 @@ class OrderChecker:
             gt_lt = "less than" if self.order == 'ASC' else "greater than"
             raise Exception(
                 "Detected out of order data. In {} sorted stream, current sorted " +
-                "value {} is {} last sorted value {}".format(
+                "value {} is {} last sorted value {}".format( # pylint: disable=too-many-format-args
                     asc_desc,
                     current_value,
                     gt_lt,
@@ -72,32 +72,43 @@ class DateWindowPaginated(Mixin):
     """
     Mixin class to provide date windowing on the `get_records` requests
     """
+    stream_id = None
+    stream_name = None
+    endpoint = None
+    key_properties = None
+    replication_keys = []
+    replication_method = None
+    _last_bookmark_value = None
+    config = None
+    state = None
+    client = None
+
     def _get_window_state(self):
-        window_state = {}
-
-        start_date = self.config['start_date']
-
-        window_start_bookmark = (singer.get_bookmark(self.state, self.stream_id, 'window_start'))
-        window_start = utils.strptime_to_utc(max(window_start_bookmark, start_date))
-
+        # TODO: add check to make sure start_date<=window_start<=window_sub_end<=window_end<=end_date
+        window_start = singer.get_bookmark(self.state, self.stream_id, 'window_start')
         sub_window_end = singer.get_bookmark(self.state, self.stream_id, 'sub_window_end')
-        sub_window_end = sub_window_end and utils.strptime_to_utc(sub_window_end)
+        window_end = singer.get_bookmark(self.state, self.stream_id, 'window_end')
 
-        window_end = singer.get_bookmark(self.state, self.stream_id, 'window_end') # TODO: how should this consider end_date?
-        window_end = utils.strptime_to_utc(window_end)
+        start_date = self.config.get('start_date')
+        end_date = self.config.get('end_date', window_end)
+
+        window_start = utils.strptime_to_utc(max(window_start, start_date))
+        sub_window_end = sub_window_end and  utils.strptime_to_utc(min(sub_window_end, end_date))
+        window_end = utils.strptime_to_utc(min(window_end, end_date))
 
         return window_start, sub_window_end, window_end
 
     def on_window_started(self):
         if singer.get_bookmark(self.state, self.stream_id, 'sub_window_end') is None:
             if singer.get_bookmark(self.state, self.stream_id, 'window_start') is None:
-                singer.write_bookmark(self.state, self.stream_id, "window_start", self.config['start_date'])
-            now = utils.strftime(utils.now())
-            singer.write_bookmark(self.state, self.stream_id, "window_end", min(self.config.get('end_date', now), now))
+                singer.write_bookmark(self.state, self.stream_id, "window_start", self.config.get('start_date'))
+            if singer.get_bookmark(self.state, self.stream_id, 'window_end') is None:
+                now = utils.strftime(utils.now())
+                singer.write_bookmark(self.state, self.stream_id, "window_end", min(self.config.get('end_date', now), now))
         singer.write_state(self.state)
 
     def on_window_finished(self):
-        # Upgrade sync_start to a bookmark here to be used next time through to override `start_date`.
+        # Set window_start to current window_end
         window_start = singer.get_bookmark(self.state, self.stream_id, "window_end")
         singer.write_bookmark(self.state, self.stream_id, "window_start", window_start)
         singer.clear_bookmark(self.state, self.stream_id, "window_end")
@@ -127,7 +138,7 @@ class DateWindowPaginated(Mixin):
     def _paginate_window(self, window_start, window_end, format_values, params):
         sub_window_end = window_end
         while True:
-            records = self.client.get(self._format_endpoint(format_values), params={"since": utils.strftime(window_start),
+            records = self.client.get(self._format_endpoint(format_values), params={"since": utils.strftime(window_start), # pylint: disable=no-member
                                                                                     "before": utils.strftime(sub_window_end),
                                                                                     **params})
             with OrderChecker("DESC") as oc:
@@ -151,7 +162,6 @@ class DateWindowPaginated(Mixin):
                             utils.strftime(window_start),
                             window_end)
                 singer.bookmarks.clear_bookmark(self.state, self.stream_id, "sub_window_end")
-                singer.write_state(self.state)
                 break
 
 
@@ -194,7 +204,7 @@ class Stream:
 class ChildStream(Stream):
     parent_class = Stream
 
-    def get_parent_ids(self, parent): # pylint: disable=no-self-use
+    def get_parent_ids(self, parent):
         # Will request for IDs of parent stream (boards currently)
         # and yield them to be used in child's sync
         LOGGER.info("%s - Retrieving IDs of parent stream: %s",
@@ -203,7 +213,7 @@ class ChildStream(Stream):
         for parent_obj in parent.get_records(parent.get_format_values(), params={"fields": "id"}):
             yield parent_obj['id']
 
-    def _sort_parent_ids_by_created(self, parent_ids):
+    def _sort_parent_ids_by_created(self, parent_ids): # pylint: disable=no-self-use
         # NB This is documented here. Yes it's hacky
         # - https://help.trello.com/article/759-getting-the-time-a-card-or-board-was-created
         parents = [{"id": x, "created": datetime.utcfromtimestamp(int(x[:8], 16))}
@@ -229,8 +239,7 @@ class ChildStream(Stream):
         if bookmarked_parent and bookmarked_parent in parent_ids:
             # NB: This will cause some rework, but it will guarantee the tap doesn't miss records if interrupted.
             # - If there's too much data to sync all parents in a single run, this API is not appropriate for that data set.
-            parent_ids = dropwhile(lambda p: p != bookmarked_parent,
-                                  parent_ids)
+            parent_ids = dropwhile(lambda p: p != bookmarked_parent, parent_ids)
         for parent_id in parent_ids:
             singer.write_bookmark(self.state, self.stream_id, "parent_id", parent_id)
             singer.write_state(self.state)
