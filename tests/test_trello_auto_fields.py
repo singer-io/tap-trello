@@ -36,7 +36,7 @@ class TestTrelloAutomaticFields(unittest.TestCase):
             'access_token_secret': os.getenv('TAP_TRELLO_ACCESS_TOKEN_SECRET'),
         }
 
-    def testable_streams(self): # TODO rip this once all streams testable
+    def testable_streams(self):
         return {
             'boards',
             'users',
@@ -215,7 +215,8 @@ class TestTrelloAutomaticFields(unittest.TestCase):
                         msg="Expected automatic fields and nothing else.")
                     continue
 
-                # verify by values # TODO this assertion may be invalid for 'users'
+                # TODO this assertion is invalid for 'users', must update auto fields with board_id for 'users'
+                # verify by values
                 actual_records = [row['data'] for row in data['messages']]
                 self.assertEqual(expected_records[stream],
                                  actual_records,

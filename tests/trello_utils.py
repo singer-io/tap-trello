@@ -9,7 +9,16 @@ from datetime import timedelta, date
 from datetime import datetime as dt
 from enum import Enum
 
-
+PARENT_STREAM = {
+    'actions': 'boards',
+    'boards': 'boards',
+    'lists': 'boards',
+}
+REPLICATION_METHOD = {
+    'actions': 'INCREMENTAL',
+    'boards': 'FULL_TABLE',
+    'lists': 'FULL_TABLE',
+}
 BASE_URL = "https://api.trello.com/1"
 HEADERS = {
     'Content-Type': 'application/json',
@@ -17,14 +26,25 @@ HEADERS = {
 PARAMS = (
     ('key', '{}'.format(os.getenv('TAP_TRELLO_CONSUMER_KEY'))),
     ('token', '{}'.format(os.getenv('TAP_TRELLO_SERVER_TOKEN'))),
-    ('since', '2020-03-01T00:00:00Z')
 )
-
-#('since', '{}'.format(dt.utcnow()))
 
 ##########################################################################
 ### Utils for retrieving existing test data 
 ##########################################################################
+def get_replication_method(stream):
+    if stream in REPLICATION_METHOD.keys():
+        return REPLICATION_METHOD.get(stream)
+
+    raise NotImplementedError(
+        "The expected replication method for {} has not been not set".format(stream)
+    )
+def get_parent_stream(stream):
+    if stream in PARENT_STREAM.keys():
+        return PARENT_STREAM.get(stream)
+
+    raise NotImplementedError(
+        "The expected replication method for {} has not been not set".format(stream)
+    )
 def get_objects(obj_type: str, obj_id: str = "", parent_id: str = ""):
     """
     get all objects for a given object
@@ -184,7 +204,6 @@ def stream_to_data_mapping(stream):
     }
     return data[mapping[stream]]
 
-
 def create_object(obj_type, obj_id: str = "", parent_id: str = ""):
     """
     Create a single record for a given object
@@ -199,9 +218,14 @@ def create_object(obj_type, obj_id: str = "", parent_id: str = ""):
     print(" * Test Data | Request: POST on /{}/".format(obj_type))
 
     data = stream_to_data_mapping(obj_type)
-    if data:    
+
+    if data:
+        if obj_type == 'lists':
+            data['idBoard'] = parent_id
+
         endpoint = get_url_string("post", obj_type)
         resp = requests.post(url=endpoint, headers=HEADERS, params=PARAMS, json=data)
+
         if resp.status_code >= 400:
             logging.warn("Request Failed {} \n    {}".format(resp.status_code, resp.text))
             return resp

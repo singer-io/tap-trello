@@ -25,7 +25,7 @@ class TestTrelloPagination(unittest.TestCase):
             raise Exception("Missing environment variables: {}".format(missing_envs))
 
     def name(self):
-        return "tap_tester_trello_no_fields_test"
+        return "tap_tester_trello_pagination_test"
 
     def get_type(self):
         return "platform.trello"
@@ -38,13 +38,13 @@ class TestTrelloPagination(unittest.TestCase):
             'access_token_secret': os.getenv('TAP_TRELLO_ACCESS_TOKEN_SECRET'),
         }
 
-    def testable_streams(self): # TODO rip this once all streams testable
+    def testable_streams(self): # Rip this if all streams testable
         return {
-            'actions'
+            'boards',
+            'lists',
         }
     def expected_check_streams(self):
         return {
-            'actions',
             'boards',
             'lists',
             'users'
@@ -52,7 +52,6 @@ class TestTrelloPagination(unittest.TestCase):
 
     def expected_sync_streams(self):
         return {
-            'actions',
             'boards',
             'lists',
             'users'
@@ -60,7 +59,6 @@ class TestTrelloPagination(unittest.TestCase):
 
     def expected_pks(self):
         return {
-            "actions": {"id"},
             "boards" : {"id"},
             "lists" : {"id"},
             "users" : {"id"}
@@ -117,11 +115,15 @@ class TestTrelloPagination(unittest.TestCase):
         fetch of data.  For instance if you have a limit of 250 records ensure
         that 251 (or more) records have been posted for that stream.
         """
+        # TODO test boundary of number of records [49, 50, 51, many]
+        # would have to change the start date for this
+        # TODO determine if we want this ^ in separate actions test or not
+
         # Ensure tested streams have a record count which exceeds the API LIMIT
         #expected_records = {x: [] for x in self.expected_sync_streams()} # ids by stream # TODO See NOTE below
         final_count = {x: 0 for x in self.expected_sync_streams()}
         for stream in self.testable_streams(): # just actions at the moment
-            parent_stream = 'boards' # TODO Set somewhere as global
+            parent_stream = utils.get_parent_stream(stream)
             record_count, parent_id = self.get_highest_record_count_and_parent_obj_id(parent_stream, stream)
             if record_count <= self.API_LIMIT:
                 logging.info("Not enough data to paginate : {} has {} records".format(stream, record_count))
@@ -133,14 +135,13 @@ class TestTrelloPagination(unittest.TestCase):
                     # NOTE: If we want exact records ^ will need to some work to find the action id that was just created
                 final_count[stream] = record_count
                 logging.info("FINAL RECORD COUNT: {} has {} records".format(stream, final_count[stream]))
-                continue
 
-        # Verify we did in fact generate enough records to exceed the API LIMIT
-        for stream in self.testable_streams():
-            with self.subTest(stream=stream):
+                # Verify we did in fact generate enough records to exceed the API LIMIT
                 # If we are failing here, it is most likely an issue with /tests/trello_utils.py
                 self.assertGreater(final_count[stream], self.API_LIMIT,
                                    msg="Failed to create sufficient data prior to sync.")
+
+                continue
 
         conn_id = connections.ensure_connection(self)
 
@@ -170,8 +171,7 @@ class TestTrelloPagination(unittest.TestCase):
                 print("Validating inclusion on {}: {}".format(cat['stream_name'], mdata))
                 self.assertTrue(mdata and mdata['metadata']['inclusion'] == 'automatic')
 
-            connections.select_catalog_and_fields_via_metadata(conn_id, cat, catalog_entry,
-                                                               non_selected_fields=non_selected_fields)
+            connections.select_catalog_and_fields_via_metadata(conn_id, cat, catalog_entry)
 
         #clear state
         menagerie.set_state(conn_id, {})
@@ -197,19 +197,19 @@ class TestTrelloPagination(unittest.TestCase):
                 self.assertGreater(record_count_by_stream.get(stream, -1), self.API_LIMIT,
                                    msg="We didn't gaurantee pagination. The number of records should exceed the api limit.")
 
-                data = synced_records.get(stream_name, [])
+                data = synced_records.get(stream, [])
                 record_messages_keys = [set(row['data'].keys()) for row in data['messages']]
 
-                
+
                 for actual_keys in record_messages_keys:
 
                     # Verify that the automatic fields are sent to the target for paginated streams
-                    self.assertEqual(self.expected_automatic_fields().get(stream_name) - actual_keys,
+                    self.assertEqual(self.expected_automatic_fields().get(stream) - actual_keys,
                                      set(), msg="A paginated synced stream has a record that is missing automatic fields.")
 
                     # Verify we have more fields sent to the target than just automatic fields (this is set above)
                     # SKIP THIS ASSERTION IF ALL FIELDS ARE INTENTIONALLY AUTOMATIC FOR THIS STREAM
-                    self.assertGreate(actual_keys, self.expected_automatic_fields().get(stream_name),
+                    self.assertGreater(actual_keys, self.expected_automatic_fields().get(stream),
                                       msg="A paginated synced stream has a record that is missing non-automatic fields.")
 
                     # TODO Get more specific with this assertion ^ genereate an exact list of expected_keys?
