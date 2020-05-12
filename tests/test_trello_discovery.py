@@ -33,7 +33,8 @@ class TestTrelloDiscovery(unittest.TestCase):
         return {
             'boards',
             'users',
-            'lists'
+            'lists',
+            'actions'
         }
 
     def tap_name(self):

@@ -225,7 +225,7 @@ class ChildStream(Stream):
         pass
 
     def on_window_finished(self):
-        pass
+        singer.write_state(self.state)
 
     def sync(self):
         self.on_window_started()
