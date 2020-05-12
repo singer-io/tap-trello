@@ -76,35 +76,31 @@ class DateWindowPaginated(Mixin):
         window_state = {}
 
         start_date = self.config['start_date']
-        window_start_bookmark = (singer.get_bookmark(self.state, self.stream_id, 'window_start') or
-                                 singer.get_bookmark(self.state, self.stream_id, 'last_sync_end') or
-                                 start_date)
+
+        window_start_bookmark = (singer.get_bookmark(self.state, self.stream_id, 'window_start'))
         window_start = utils.strptime_to_utc(max(window_start_bookmark, start_date))
 
-        window_sub_end = singer.get_bookmark(self.state, self.stream_id, 'window_sub_end')
-        window_sub_end = window_sub_end and utils.strptime_to_utc(window_sub_end)
+        sub_window_end = singer.get_bookmark(self.state, self.stream_id, 'sub_window_end')
+        sub_window_end = sub_window_end and utils.strptime_to_utc(sub_window_end)
 
-        next_window_start = singer.get_bookmark(self.state, self.stream_id, 'next_window_start')
-        next_window_start = next_window_start and utils.strptime_to_utc(next_window_start)
+        window_end = singer.get_bookmark(self.state, self.stream_id, 'window_end') # TODO: how should this consider end_date?
+        window_end = utils.strptime_to_utc(window_end)
 
-        if window_sub_end is not None and next_window_start is None:
-            raise Exception("Invalid State: window_sub_end provided without a next_window_start.")
+        return window_start, sub_window_end, window_end
 
-        return window_start, window_sub_end, next_window_start
-
-    def on_sync_started(self):
-        # Hook from `sync` implementer: Save when we started the overall sync, to use as a bookmark, later
-        now = utils.strftime(utils.now())
-        singer.write_bookmark(self.state, self.stream_id, "sync_end", min(self.config.get('end_date', now), now))
-        singer.write_bookmark(self.state, self.stream_id, "in_middle_of_sync", True)
+    def on_window_started(self):
+        if singer.get_bookmark(self.state, self.stream_id, 'sub_window_end') is None:
+            if singer.get_bookmark(self.state, self.stream_id, 'window_start') is None:
+                singer.write_bookmark(self.state, self.stream_id, "window_start", self.config['start_date'])
+            now = utils.strftime(utils.now())
+            singer.write_bookmark(self.state, self.stream_id, "window_end", min(self.config.get('end_date', now), now))
         singer.write_state(self.state)
 
-    def on_sync_finished(self):
+    def on_window_finished(self):
         # Upgrade sync_start to a bookmark here to be used next time through to override `start_date`.
-        last_sync_end = singer.get_bookmark(self.state, self.stream_id, "sync_end")
-        singer.write_bookmark(self.state, self.stream_id, "last_sync_end", last_sync_end)
-        singer.clear_bookmark(self.state, self.stream_id, "sync_end")
-        singer.write_bookmark(self.state, self.stream_id, "in_middle_of_sync", False)
+        window_start = singer.get_bookmark(self.state, self.stream_id, "window_end")
+        singer.write_bookmark(self.state, self.stream_id, "window_start", window_start)
+        singer.clear_bookmark(self.state, self.stream_id, "window_end")
         singer.write_state(self.state)
 
     def get_records(self, format_values, params=None):
@@ -112,23 +108,14 @@ class DateWindowPaginated(Mixin):
         if params is None:
             params = {}
 
-        window_start, window_sub_end, next_window_start = self._get_window_state()
+        window_start, sub_window_end, window_end = self._get_window_state()
         window_start -= timedelta(milliseconds=1) # To make start inclusive
 
-        if window_sub_end is not None:
-            # Indicates we need to resume, next_window_start should be present
-            next_window_start -= timedelta(milliseconds=1) # To make next start inclusive
-            LOGGER.info('Paginating with window_sub_end')
-            for rec in self._paginate_window(window_start, window_sub_end, format_values, params):
+        if sub_window_end is not None:
+            for rec in self._paginate_window(window_start, sub_window_end, format_values, params):
                 yield rec
-
         else:
-            # sync_end refers to the right-bound of our last window
-            sync_end = singer.get_bookmark(self.state, self.stream_id, "sync_end")
-            sync_end = utils.strptime_to_utc(sync_end)
-
-            self._update_bookmark("next_window_start", sync_end)
-            for rec in self._paginate_window(window_start, sync_end, format_values, params):
+            for rec in self._paginate_window(window_start, window_end, format_values, params):
                 yield rec
 
 
@@ -138,13 +125,10 @@ class DateWindowPaginated(Mixin):
         )
 
     def _paginate_window(self, window_start, window_end, format_values, params):
-        self._update_bookmark("window_start", window_start)
-        self._update_bookmark("window_sub_end", window_end)
-        singer.write_state(self.state)
-        
+        sub_window_end = window_end
         while True:
             records = self.client.get(self._format_endpoint(format_values), params={"since": utils.strftime(window_start),
-                                                                                    "before": utils.strftime(window_end),
+                                                                                    "before": utils.strftime(sub_window_end),
                                                                                     **params})
             with OrderChecker("DESC") as oc:
                 for rec in records:
@@ -154,22 +138,22 @@ class DateWindowPaginated(Mixin):
             if len(records) >= MAX_API_RESPONSE_SIZE:
                 LOGGER.info("%s - Paginating within date_window %s to %s, due to max records being received.",
                             self.stream_id,
-                            utils.strftime(window_start), utils.strftime(window_end))
+                            utils.strftime(window_start), utils.strftime(sub_window_end))
                 # NB: Actions are sorted backwards, so if we get the
                 # max_response_size, set the window_end to the last
                 # record's timestamp (inclusive) and try again.
-                window_end = utils.strptime_to_utc(records[-1]["date"]) + timedelta(milliseconds=1)
-                self._update_bookmark("window_sub_end", window_end)
+                sub_window_end = utils.strptime_to_utc(records[-1]["date"]) + timedelta(milliseconds=1)
+                self._update_bookmark("sub_window_end", sub_window_end)
                 singer.write_state(self.state)
             else:
                 LOGGER.info("%s - Finished syncing between %s and %s",
                             self.stream_id,
                             utils.strftime(window_start),
-                            singer.get_bookmark(self.state, self.stream_id, "next_window_start"))
-                singer.bookmarks.clear_bookmark(self.state, self.stream_id, "window_start")
-                singer.bookmarks.clear_bookmark(self.state, self.stream_id, "window_sub_end")
-                singer.bookmarks.clear_bookmark(self.state, self.stream_id, "next_window_start")
+                            window_end)
+                singer.bookmarks.clear_bookmark(self.state, self.stream_id, "sub_window_end")
+                singer.write_state(self.state)
                 break
+
 
 
 class Stream:
@@ -228,15 +212,14 @@ class ChildStream(Stream):
 
     # TODO: If we need second-level child streams, most of sync needs pulled into get_records for this class
 
-    def on_sync_started(self):
+    def on_window_started(self):
         pass
 
-    def on_sync_finished(self):
+    def on_window_finished(self):
         pass
 
     def sync(self):
-        if singer.get_bookmark(self.state, self.stream_id, 'in_middle_of_sync', default=False) == False:
-            self.on_sync_started()
+        self.on_window_started()
         parent = self.parent_class(self.client, self.config, self.state)
 
         # Get the most recent parent ID and resume from there, if necessary
@@ -249,19 +232,12 @@ class ChildStream(Stream):
             parent_ids = dropwhile(lambda p: p != bookmarked_parent,
                                   parent_ids)
         for parent_id in parent_ids:
-            # --- Clear State
-            # --- Add parent_id for next time
-            # Clear all but sync_start and parent_id
             singer.write_bookmark(self.state, self.stream_id, "parent_id", parent_id)
             singer.write_state(self.state)
             for rec in self.get_records([parent_id]):
                 yield rec
         singer.clear_bookmark(self.state, self.stream_id, "parent_id")
-        self.on_sync_finished()
-        # -- Write child's bookmark to "now", maybe ask self what that means?
-        # - e.g., self.write_bookmark_to_now() or something similar where we write the "earliest now that was written"
-        # -- And remove the parent_id bookmark (we're done)
-
+        self.on_window_finished()
 
 
 class Boards(Unsortable, Stream):
