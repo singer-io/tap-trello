@@ -1,24 +1,168 @@
+from datetime import datetime, timedelta
+from itertools import dropwhile
 import singer
 
-class NonBookmarked():
-    """
-    Mixin class to override Stream implementations for streams that can't store a bookmark.
-    e.g.:
-        class MyStream(NonBookmarked, Stream):
-            # Specify properties, implement unique things
-    """
-    def update_bookmark(self, bookmark_value):
-        """Defines the stream as non-bookmarkable"""
+from singer import utils
 
-class Unsortable():
+LOGGER = singer.get_logger()
+
+class OrderChecker:
+    """ Class with context manager to check ordering of values. """
+    order = None
+    _last_value = None
+
+    def __init__(self, order='ASC'):
+        self.order = order
+
+    def check_order(self, current_value):
+        """
+        We are sub-paginating based on a sort order descending assumption for
+        Actions, this ensures that this holds up.
+        """
+        if self.order == 'ASC':
+            check_paired_order = lambda a, b: a < b
+        else:
+            check_paired_order = lambda a, b: a > b
+
+        if self._last_value is None:
+            self._last_value = current_value
+
+        if check_paired_order(current_value, self._last_value):
+            asc_desc = "ascending" if self.order == 'ASC' else "descending"
+            gt_lt = "less than" if self.order == 'ASC' else "greater than"
+            raise Exception(
+                ("Detected out of order data. In {} sorted stream, current sorted " +
+                 "value {} is {} last sorted value {}").format(
+                     asc_desc,
+                     current_value,
+                     gt_lt,
+                     self._last_value)
+            )
+
+        self._last_value = current_value
+
+    def __enter__(self):
+        """
+        Reset last known value for an `OrderChecker` object used across
+        multiple `with` blocks to scope within the current block context.
+        """
+        self._last_value = None
+        return self
+
+    def __exit__(self, *args):
+        """ Required for context manager usage. """
+
+class Mixin:
+    """ Empty class to mark mixin classes as such. """
+
+class Unsortable(Mixin):
     """
-    Mixin class to override Stream implementations for FullTable streams.
+    Mixin class to mark a Stream subclass as Unsortable
+    NB: No current functionality, but we thought it was useful for higher-order declarative behavior.
     e.g.:
         class MyStream(Unsortable, Stream):
             # Specify properties, implement unique things
     """
-    def check_order(self, current_bookmark_value):
-        """Defines this stream as not sortable """
+
+
+# NB: We've observed that Trello will only return 50 actions, this is to sub-paginate
+MAX_API_RESPONSE_SIZE = 50
+
+class DateWindowPaginated(Mixin):
+    """
+    Mixin class to provide date windowing on the `get_records` requests
+    """
+    stream_id = None
+    stream_name = None
+    endpoint = None
+    key_properties = None
+    replication_keys = []
+    replication_method = None
+    _last_bookmark_value = None
+    config = None
+    state = None
+    client = None
+
+    def _get_window_state(self):
+        window_start = singer.get_bookmark(self.state, self.stream_id, 'window_start')
+        sub_window_end = singer.get_bookmark(self.state, self.stream_id, 'sub_window_end')
+        window_end = singer.get_bookmark(self.state, self.stream_id, 'window_end')
+
+        start_date = self.config.get('start_date')
+        end_date = self.config.get('end_date', window_end)
+
+        window_start = utils.strptime_to_utc(max(window_start, start_date))
+        sub_window_end = sub_window_end and  utils.strptime_to_utc(min(sub_window_end, end_date))
+        window_end = utils.strptime_to_utc(min(window_end, end_date))
+
+        return window_start, sub_window_end, window_end
+
+    def on_window_started(self):
+        if singer.get_bookmark(self.state, self.stream_id, 'sub_window_end') is None:
+            if singer.get_bookmark(self.state, self.stream_id, 'window_start') is None:
+                singer.write_bookmark(self.state, self.stream_id, "window_start", self.config.get('start_date'))
+            if singer.get_bookmark(self.state, self.stream_id, 'window_end') is None:
+                now = utils.strftime(utils.now())
+                singer.write_bookmark(self.state, self.stream_id, "window_end", min(self.config.get('end_date', now), now))
+        singer.write_state(self.state)
+
+    def on_window_finished(self):
+        # Set window_start to current window_end
+        window_start = singer.get_bookmark(self.state, self.stream_id, "window_end")
+        singer.write_bookmark(self.state, self.stream_id, "window_start", window_start)
+        singer.clear_bookmark(self.state, self.stream_id, "window_end")
+        singer.write_state(self.state)
+
+    def get_records(self, format_values, params=None):
+        """ Overrides the default get_records to provide date_window pagination and bookmarking. """
+        if params is None:
+            params = {}
+
+        window_start, sub_window_end, window_end = self._get_window_state()
+        window_start -= timedelta(milliseconds=1) # To make start inclusive
+
+        if sub_window_end is not None:
+            for rec in self._paginate_window(window_start, sub_window_end, format_values, params):
+                yield rec
+        else:
+            for rec in self._paginate_window(window_start, window_end, format_values, params):
+                yield rec
+
+
+    def _update_bookmark(self, key, value):
+        singer.bookmarks.write_bookmark(
+            self.state, self.stream_id, key, utils.strftime(value)
+        )
+
+    def _paginate_window(self, window_start, window_end, format_values, params):
+        sub_window_end = window_end
+        while True:
+            records = self.client.get(self._format_endpoint(format_values), params={"since": utils.strftime(window_start), # pylint: disable=no-member
+                                                                                    "before": utils.strftime(sub_window_end),
+                                                                                    **params})
+            with OrderChecker("DESC") as oc:
+                for rec in records:
+                    oc.check_order(rec["date"])
+                    yield rec
+
+            if len(records) >= MAX_API_RESPONSE_SIZE:
+                LOGGER.info("%s - Paginating within date_window %s to %s, due to max records being received.",
+                            self.stream_id,
+                            utils.strftime(window_start), utils.strftime(sub_window_end))
+                # NB: Actions are sorted backwards, so if we get the
+                # max_response_size, set the window_end to the last
+                # record's timestamp (inclusive) and try again.
+                sub_window_end = utils.strptime_to_utc(records[-1]["date"]) + timedelta(milliseconds=1)
+                self._update_bookmark("sub_window_end", sub_window_end)
+                singer.write_state(self.state)
+            else:
+                LOGGER.info("%s - Finished syncing between %s and %s",
+                            self.stream_id,
+                            utils.strftime(window_start),
+                            window_end)
+                singer.bookmarks.clear_bookmark(self.state, self.stream_id, "sub_window_end")
+                break
+
 
 
 class Stream:
@@ -36,11 +180,6 @@ class Stream:
         self.state = state
 
 
-    def get_params(self): # pylint: disable=no-self-use
-        """ To be overriden in child. """
-        return {}
-
-
     def get_format_values(self): # pylint: disable=no-self-use
         return []
 
@@ -48,75 +187,74 @@ class Stream:
         return self.endpoint.format(*format_values)
 
 
-    def update_bookmark(self, bookmark_value):
-        singer.bookmarks.write_bookmark(
-            self.state, self.stream_name, self.replication_keys[0], bookmark_value
-        )
-        singer.write_state(self.state)
-
-
-    def check_order(self, current_bookmark_value):
-        if self._last_bookmark_value is None:
-            self._last_bookmark_value = current_bookmark_value
-
-        if current_bookmark_value < self._last_bookmark_value:
-            raise Exception(
-                "Detected out of order data. Current bookmark value {} is less than last bookmark value {}".format(
-                    current_bookmark_value, self._last_bookmark_value
-                )
-            )
-
-        self._last_bookmark_value = current_bookmark_value
-
-
     def get_records(self, format_values, params=None):
         if params is None:
             params = {}
-        records = self.client.get(self._format_endpoint(format_values), {**self.get_params(), **params})
+        records = self.client.get(self._format_endpoint(format_values), params=params)
 
         return records
 
 
     def sync(self):
         for rec in self.get_records(self.get_format_values()):
-            if self.replication_keys:
-                current_bookmark_value = rec[self.replication_keys[0]]
-                self.check_order(current_bookmark_value)
-                self.update_bookmark(current_bookmark_value)
             yield rec
 
 
 class ChildStream(Stream):
     parent_class = Stream
 
-    def get_parent_ids(self, parent): # pylint: disable=no-self-use
+    def get_parent_ids(self, parent):
         # Will request for IDs of parent stream (boards currently)
         # and yield them to be used in child's sync
+        LOGGER.info("%s - Retrieving IDs of parent stream: %s",
+                    self.stream_id,
+                    self.parent_class.stream_id)
         for parent_obj in parent.get_records(parent.get_format_values(), params={"fields": "id"}):
             yield parent_obj['id']
 
+    def _sort_parent_ids_by_created(self, parent_ids): # pylint: disable=no-self-use
+        # NB This is documented here. Yes it's hacky
+        # - https://help.trello.com/article/759-getting-the-time-a-card-or-board-was-created
+        parents = [{"id": x, "created": datetime.utcfromtimestamp(int(x[:8], 16))}
+                   for x in parent_ids]
+        return sorted(parents, key=lambda x: x["created"])
+
     # TODO: If we need second-level child streams, most of sync needs pulled into get_records for this class
 
+    def on_window_started(self):
+        pass
+
+    def on_window_finished(self):
+        singer.write_state(self.state)
+
     def sync(self):
+        self.on_window_started()
         parent = self.parent_class(self.client, self.config, self.state)
-        for parent_id in self.get_parent_ids(parent):
-            # Get users for "parent_id" (aka board_id)
+
+        # Get the most recent parent ID and resume from there, if necessary
+        bookmarked_parent = singer.get_bookmark(self.state, self.stream_id, 'parent_id')
+        parent_ids = [p['id'] for p in self._sort_parent_ids_by_created(self.get_parent_ids(parent))]
+
+        if bookmarked_parent and bookmarked_parent in parent_ids:
+            # NB: This will cause some rework, but it will guarantee the tap doesn't miss records if interrupted.
+            # - If there's too much data to sync all parents in a single run, this API is not appropriate for that data set.
+            parent_ids = dropwhile(lambda p: p != bookmarked_parent, parent_ids)
+        for parent_id in parent_ids:
+            singer.write_bookmark(self.state, self.stream_id, "parent_id", parent_id)
+            singer.write_state(self.state)
             for rec in self.get_records([parent_id]):
-                if self.replication_keys:
-                    current_bookmark_value = rec[self.replication_keys[0]]
-                    self.check_order(current_bookmark_value)
-                    self.update_bookmark(current_bookmark_value)
                 yield rec
+        singer.clear_bookmark(self.state, self.stream_id, "parent_id")
+        self.on_window_finished()
 
 
-
-class Boards(NonBookmarked, Unsortable, Stream):
+class Boards(Unsortable, Stream):
     # TODO: Should boards respect the start date? i.e., not emit records from before the configured start?
+    # TODO: Is this also limited to 50 records per response? If so, might need paginated...
     stream_id = "boards"
     stream_name = "boards"
     endpoint = "/members/{}/boards"
     key_properties = ["id"]
-    replication_keys = []
     replication_method = "FULL_TABLE"
 
 
@@ -124,31 +262,40 @@ class Boards(NonBookmarked, Unsortable, Stream):
         return [self.client.member_id]
 
 
-class Users(NonBookmarked, Unsortable, ChildStream):
+class Users(Unsortable, ChildStream):
     # TODO: If a user is added to a board, does the board's dateLastActivity get updated?
     # TODO: Should this assoc the board_id to the user records? Seems pretty useless without it
     stream_id = "users"
     stream_name = "users"
     endpoint = "/boards/{}/members"
     key_properties = ["id"]
-    replication_keys = []
     replication_method = "FULL_TABLE"
     parent_class = Boards
 
 
-class Lists(NonBookmarked, Unsortable, ChildStream):
+class Lists(Unsortable, ChildStream):
     # TODO: If a list is added to a board, does the board's dateLastActivity get updated?
     stream_id = "lists"
     stream_name = "lists"
     endpoint = "/boards/{}/lists"
     key_properties = ["id"]
-    replication_keys = []
     replication_method = "FULL_TABLE"
     parent_class = Boards
 
+
+class Actions(DateWindowPaginated, ChildStream):
+    # TODO: If an action is completed on a board, does the board's dateLastActivity get updated?
+    stream_id = "actions"
+    stream_name = "actions"
+    endpoint = "/boards/{}/actions"
+    key_properties = ["id"]
+    replication_method = "INCREMENTAL"
+    parent_class = Boards
 
 
 STREAM_OBJECTS = {
     'boards': Boards,
     'users': Users,
-    'lists': Lists}
+    'lists': Lists,
+    'actions': Actions,
+}
