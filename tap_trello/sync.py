@@ -38,5 +38,5 @@ def do_sync(client, config, state, catalog):
                     stream_id,
                     transformer.transform(
                         rec, stream.schema.to_dict(), metadata.to_map(stream.metadata),
-                    ),
+                    )
                 )
