@@ -200,7 +200,7 @@ class Stream:
             params={
                 "limit": self.MAX_API_RESPONSE_SIZE,
                 **params
-        })
+            })
 
         if self.MAX_API_RESPONSE_SIZE and len(records) >= self.MAX_API_RESPONSE_SIZE:
             raise Exception(
