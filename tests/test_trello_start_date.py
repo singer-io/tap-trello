@@ -46,6 +46,7 @@ class TestTrelloStartDate(unittest.TestCase):
         return {
             'boards',
             'lists',
+            'users'
         }
     def expected_check_streams(self):
         return {
@@ -55,18 +56,13 @@ class TestTrelloStartDate(unittest.TestCase):
         }
 
     def expected_sync_streams(self):
-        return {
-            'boards',
-            'lists',
-            'users'
-        }
+        return self.expected_check_streams()
 
     def expected_pks(self):
         return {
             "boards" : {"id"},
             "lists" : {"id"},
             "users" : {"id"}
-
         }
 
     def expected_automatic_fields(self):

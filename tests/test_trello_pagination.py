@@ -38,11 +38,17 @@ class TestTrelloPagination(unittest.TestCase):
             'access_token_secret': os.getenv('TAP_TRELLO_ACCESS_TOKEN_SECRET'),
         }
 
-    def testable_streams(self): # Rip this if all streams testable
+    def testable_streams(self):
+        """
+        Not all streams are testable.
+        : users: would need to manually create enough members to exceed API LIMIT
+        """
         return {
             'boards',
             'lists',
+            'users'
         }
+
     def expected_check_streams(self):
         return {
             'boards',
@@ -51,11 +57,7 @@ class TestTrelloPagination(unittest.TestCase):
         }
 
     def expected_sync_streams(self):
-        return {
-            'boards',
-            'lists',
-            'users'
-        }
+        return self.expected_check_streams()
 
     def expected_pks(self):
         return {
@@ -98,11 +100,15 @@ class TestTrelloPagination(unittest.TestCase):
         highest_count = 0
 
         for obj in parent_objects:
+            if obj['name'] == "NEVER DELETE BOARD":
+                import pdb; pdb.set_trace()
             objects = utils.get_objects(obj_type=child_stream, parent_id=obj.get('id'))
+
             if len(objects) > highest_count:
                 highest_count = len(objects)
                 return_object = obj['id']
-
+        if child_stream == 'users':
+            import pdb; pdb.set_trace()
         return highest_count, return_object
 
     def test_run(self):
@@ -115,9 +121,6 @@ class TestTrelloPagination(unittest.TestCase):
         fetch of data.  For instance if you have a limit of 250 records ensure
         that 251 (or more) records have been posted for that stream.
         """
-        # TODO test boundary of number of records [49, 50, 51, many]
-        # would have to change the start date for this
-        # TODO determine if we want this ^ in separate actions test or not
 
         # Ensure tested streams have a record count which exceeds the API LIMIT
         #expected_records = {x: [] for x in self.expected_sync_streams()} # ids by stream # TODO See NOTE below

@@ -218,8 +218,8 @@ class TestTrelloAutomaticFields(unittest.TestCase):
                 # TODO this assertion below is invalid for 'users',
                 # must update self.expected_automatic_fields() once auto fields with board_id for 'users'
 
-                if stream == 'users':
-                    continue # Skipping last assertion
+                # if stream == 'users':
+                #     continue # Skipping last assertion
 
                 # verify by values
                 actual_records = [row['data'] for row in data['messages']]

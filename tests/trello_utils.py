@@ -13,11 +13,18 @@ PARENT_STREAM = {
     'actions': 'boards',
     'boards': 'boards',
     'lists': 'boards',
+    'users': 'boards'
 }
 REPLICATION_METHOD = {
     'actions': 'INCREMENTAL',
     'boards': 'FULL_TABLE',
     'lists': 'FULL_TABLE',
+    'users': 'FULL_TABLE'
+}
+TEST_USERS = {
+    'Test User 1': {'username': 'test_user64646@mailinator.com', 'password': os.getenv('TRELLO_TEST_USER_1_PW')},
+    'Test User 2': {'username': 'test_user12297@mailinator.com', 'password': os.getenv('TRELLO_TEST_USER_2_PW')},
+    'Test User 3': {'username': 'test_user99393@mailinator.com', 'password': os.getenv('TRELLO_TEST_USER_3_PW')}
 }
 BASE_URL = "https://api.trello.com/1"
 HEADERS = {
@@ -133,7 +140,7 @@ def get_test_data():
 
     TEST_DATA = {
         "BOARDS": {"name": "Test Board {}".format(tstamp)},
-        "USERS": "",  # TODO {"fullName":"xae a12","username":"singersongwriterd42"}
+        "USERS": {"type": ""},  # TODO {"fullName":"xae a12","username":"singersongwriterd42"}
         "CARDS": {
             "name":"Card {}".format(tstamp),
             "desc": "This is a description.",
@@ -177,7 +184,9 @@ def update_object(obj_type: str, obj_id: str = '', parent_id: str = '', field_to
     
     data = stream_to_data_mapping(obj_type)
     if data:
-        data_to_update = {field_to_update: data.get(field_to_update)} # just change the name
+        if data.get(field_to_update):
+            data_to_update = {field_to_update: data.get(field_to_update)} # just change the name for baords (actions)
+        data_to_update = {field_to_update: "admin"} # add member to a board for users
         endpoint = get_url_string("put", obj_type, obj_id, parent_id)
         print(" * Test Data | Changing: {} ".format(data_to_update))
         resp = requests.put(url=endpoint, headers=HEADERS, params=PARAMS, json=data_to_update)
@@ -213,7 +222,12 @@ def create_object(obj_type, obj_id: str = "", parent_id: str = ""):
     return that object or none if create fails
     """
     if obj_type == 'actions':
+        print(" * Test Data | CREATES ARE UNAVAILABLE for {}".format(obj_type))
         return update_object('boards', obj_id=parent_id)
+    if obj_type == 'users':
+        print(" * Test Data | CREATES ARE UNAVAILABLE for {}".format(obj_type))
+        return update_object(obj_type=obj_type, obj_id=obj_id,
+                             parent_id=parent_id, field_to_update="type")
 
     print(" * Test Data | Request: POST on /{}/".format(obj_type))
 
@@ -242,8 +256,9 @@ if __name__ == "__main__":
     test_creates = False
     test_updates = False
     test_gets = True
+    print_objects = True
 
-    objects_to_test = ['actions', 'cards', 'lists'] #'boards'
+    objects_to_test = ['users'] # ['actions', 'cards', 'lists'] #'boards'
 
     print("********** Testing basic functions of utils **********")
     if test_creates:
@@ -252,14 +267,18 @@ if __name__ == "__main__":
             created_obj = create_object(obj)
             if created_obj:
                 print("SUCCESS")
+                if print_objects:
+                    print(created_obj)
                 continue
             print("FAILED")
     if test_updates:
         for obj in objects_to_test:
             print("Testing UPDATE: {}".format(obj))
             updated_obj = update_object(obj)
-            if created_obj:
+            if updated_obj:
                 print("SUCCESS")
+                if print_objects:
+                    print(updated_obj)
                 continue
             print("FAILED")
     if test_gets:
@@ -268,6 +287,8 @@ if __name__ == "__main__":
             existing_objs = get_objects(obj)
             if existing_objs:
                 print("SUCCESS")
+                if print_objects:
+                    print(existing_objs)
                 continue
             print("FAILED")
 
