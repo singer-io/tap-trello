@@ -32,7 +32,7 @@ HEADERS = {
 }
 PARAMS = (
     ('key', '{}'.format(os.getenv('TAP_TRELLO_CONSUMER_KEY'))),
-    ('token', '{}'.format(os.getenv('TAP_TRELLO_SERVER_TOKEN'))),
+    ('token', '{}'.format(os.getenv('TAP_TRELLO_TESTING_TOKEN'))),
 )
 
 ##########################################################################

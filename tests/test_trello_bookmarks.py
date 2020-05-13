@@ -148,7 +148,7 @@ class TrelloBookmarks(unittest.TestCase):
             self, conn_id, self.expected_sync_streams(), self.expected_pks()
         )
         replicated_row_count_1 =  reduce(lambda accum,c : accum + c, record_count_by_stream_1.values())
-        self.assertGreater(replicated_row_count, 0, msg="failed to replicate any data: {}".format(record_count_by_stream_1))
+        self.assertGreater(replicated_row_count_1, 0, msg="failed to replicate any data: {}".format(record_count_by_stream_1))
         print("total replicated row count: {}".format(replicated_row_count_1))
 
         # Verify that automatic fields are all emitted with records
@@ -197,7 +197,7 @@ class TrelloBookmarks(unittest.TestCase):
         print("Bookmarks meet expectations")
 
         # TESTING FULL TABLE STREAMS
-        for stream in self.expected_full_table_sync_streams():
+        for stream in self.expected_full_table_sync_streams().difference(self.untestable_streams()):
             record_count_1 = record_count_by_stream_1.get(stream, 0)
             record_count_2 = record_count_by_stream_2.get(stream, 0)
 
@@ -211,16 +211,17 @@ class TrelloBookmarks(unittest.TestCase):
             self.assertEqual((record_count_2 - record_count_1),
                              len(expected_records_2.get(stream, [])),
                              msg="The differnce in record counts between syncs should " +\
-                             "equal the number of records we created between syncs.")
+                             "equal the number of records we created between syncs.\n" +\
+                             "This is not the case for {}".format(stream))
 
-            # Assert that we are capturing the expected records for full table streams
+            # TODO Assert that we are capturing the expected records for full table streams
 
         import pdb; pdb.set_trace()
 
         print("ENDING TEST HERE FOR NOW.")
 
         # TESTING INCREMENTAL STREAMS
-        for stream in self.expected_incremental_sync_streams():
+        for stream in self.expected_incremental_sync_streams().difference(self.untestable_streams()):
             record_count_1 = record_count_by_stream_1.get(stream, 0)
             record_count_2 = record_count_by_stream_2.get(stream, 0)
 
