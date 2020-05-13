@@ -22,9 +22,9 @@ REPLICATION_METHOD = {
     'users': 'FULL_TABLE'
 }
 TEST_USERS = {
-    'Test User 1': {'username': 'test_user64646@mailinator.com', 'password': os.getenv('TRELLO_TEST_USER_1_PW')},
-    'Test User 2': {'username': 'test_user12297@mailinator.com', 'password': os.getenv('TRELLO_TEST_USER_2_PW')},
-    'Test User 3': {'username': 'test_user99393@mailinator.com', 'password': os.getenv('TRELLO_TEST_USER_3_PW')}
+    'Test User 1': {'username': os.getenv('TRELLO_TEST_USER_1_EMAIL'), 'password': os.getenv('TRELLO_TEST_USER_1_PW')},
+    'Test User 2': {'username': os.getenv('TRELLO_TEST_USER_2_EMAIL'), 'password': os.getenv('TRELLO_TEST_USER_2_PW')},
+    'Test User 3': {'username': os.getenv('TRELLO_TEST_USER_3_EMAIL'), 'password': os.getenv('TRELLO_TEST_USER_3_PW')}
 }
 BASE_URL = "https://api.trello.com/1"
 HEADERS = {
@@ -111,14 +111,14 @@ def get_url_string(req: str, obj_type: str, obj_id: str = "", parent_id: str = "
     elif obj_type == 'actions':
         url_string += "/boards/{}/actions/{}".format(parent_id, obj_id)
 
-    elif obj_type == 'cards':
-        if req == "get":
-            url_string += "/boards/{}/cards/{}".format(parent_id, obj_id)
-        else:
-            url_string += "/cards/{}".format(obj_id)
+    # elif obj_type == 'cards':
+    #     if req == "get":
+    #         url_string += "/boards/{}/cards/{}".format(parent_id, obj_id)
+    #     else:
+    #         url_string += "/cards/{}".format(obj_id)
 
     elif obj_type == 'lists':
-        if req == 'get':
+        if req == 'get' or 'delete':
             url_string += "/boards/{}/lists".format(parent_id)
         else:
             url_string += "/lists/{}".format(obj_id)
@@ -127,6 +127,30 @@ def get_url_string(req: str, obj_type: str, obj_id: str = "", parent_id: str = "
 
     return url_string
 
+
+def get_total_record_count_and_objects(parent_stream: str, child_stream: str):
+    """Return the count and all records of a given child stream"""
+    parent_objects = get_objects(obj_type=parent_stream)
+
+    # If true, then this stream is top level so just need 1 get ^
+    if parent_stream == child_stream:
+        return len(parent_objects), parent_objects
+
+    count = 0
+    existing_objects = []
+    for obj in parent_objects:
+        objects = get_objects(obj_type=child_stream, parent_id=obj.get('id'))
+        for obj in objects:
+            already_tracked = False
+            for e_obj in existing_objects:
+                if obj['id'] == e_obj['id']:
+                    already_tracked = True
+                    break
+            if not already_tracked:
+                existing_objects.append(obj)
+        count += len(objects)
+
+    return count, existing_objects
 
 ##########################################################################
 ### Test Data
@@ -178,7 +202,7 @@ def update_object(obj_type: str, obj_id: str = '', parent_id: str = '', field_to
     update an existing object in order to genereate a new 'actions' record
     """
     print(" * Test Data | Request: PUT on /{}/".format(obj_type))
-
+    
     if not obj_id:
         obj_id = get_random_object_id(obj_type)
     
@@ -192,12 +216,34 @@ def update_object(obj_type: str, obj_id: str = '', parent_id: str = '', field_to
         resp = requests.put(url=endpoint, headers=HEADERS, params=PARAMS, json=data_to_update)
         if resp.status_code >= 400:
             logging.warn("Request Failed {} \n    {}".format(resp.status_code, resp.text))
-            return resp
+            return None
 
         return resp.json()
 
     raise NotImplementedError
 
+def update_object_user(obj_id: str = '', parent_id: str = '', field_to_update: str = 'type'):
+    """Update a user by adding them to a board"""
+    if not obj_id:
+        obj_id = get_random_object_id('users')
+    
+    data = stream_to_data_mapping('users')
+    if data:
+        data_to_update = {field_to_update: "admin"} # add member to a board for users
+        endpoint = get_url_string('put', 'users', obj_id, parent_id)
+        print(" * Test Data | Changing: {} ".format(data_to_update))
+        resp = requests.put(url=endpoint, headers=HEADERS, params=PARAMS, json=data_to_update)
+        if resp.status_code >= 400:
+            logging.warn("Request Failed {} \n    {}".format(resp.status_code, resp.text))
+            data_to_update = {field_to_update: "normal"} # add member to a board for users
+            print(" * Test Data | Changing: {} ".format(data_to_update))
+            resp = requests.put(url=endpoint, headers=HEADERS, params=PARAMS, json=data_to_update)
+            if resp.status_code >= 400:
+                return None
+
+        return resp.json()
+
+    raise NotImplementedError
 
 ##########################################################################
 ### Utils for creating new test data
@@ -213,28 +259,72 @@ def stream_to_data_mapping(stream):
     }
     return data[mapping[stream]]
 
+def get_action_fields_by_stream():
+    """
+    returns the a dict of objects with a list of fields that can be altered in order to generate new actions
+    """
+    return {
+        'boards': ['name'],
+    }
+
+# TODO add a parent id for updating child streams
+def create_object_actions(recipient_stream: str = "boards", obj_id: str = ""):
+    """
+    method for generating specifc actions
+    : param obj_id: id of action object
+    : param parent_id: id of parent object (this will most likely be a board) # TODO may not need??
+    : param recipient_stream: stream to update in order to genereate an action, important to track for setting expectations
+
+    return the new actions object that was just completed
+    """
+    if not obj_id:
+        obj_id = get_random_object_id(recipient_stream)
+
+    pot_fields_to_update = get_action_fields_by_stream().get(recipient_stream)
+    field_to_update = pot_fields_to_update[random.randint(0, len(pot_fields_to_update) - 1)]
+    
+    data = stream_to_data_mapping(recipient_stream)
+    if data:
+        if data.get(field_to_update):
+            data_to_update = {field_to_update: data.get(field_to_update)} # just change the name for baords (actions)
+
+            endpoint = get_url_string("put", recipient_stream, obj_id)
+            print(" * Test Data | Changing: {} ".format(data_to_update))
+            resp = requests.put(url=endpoint, headers=HEADERS, params=PARAMS, json=data_to_update)
+            if resp.status_code >= 400:
+                logging.warn("Request Failed {} \n    {}".format(resp.status_code, resp.text))
+                return None
+            recipient_object_id = resp.json().get('id')
+            actions_objects = get_objects(obj_type='actions', parent_id=recipient_object_id)
+
+            return actions_objects[0]
+
+    raise NotImplementedError
+    
 def create_object(obj_type, obj_id: str = "", parent_id: str = ""):
     """
     Create a single record for a given object
 
-    To create an actions record, we will call update for another object stream
+    Creates are not available for:
+    : actions: we will call update for baords object instea
+    : users: we will call update the user instead (add them to a baord)n
 
     return that object or none if create fails
     """
     if obj_type == 'actions':
-        print(" * Test Data | CREATES ARE UNAVAILABLE for {}".format(obj_type))
-        return update_object('boards', obj_id=parent_id)
+        print(" * Test Data | DIRECT CREATES ARE UNAVAILABLE for {}. " +\
+              "UPDATING another stream to generate new record".format(obj_type))
+        return create_object_actions('boards', obj_id=parent_id)
     if obj_type == 'users':
         print(" * Test Data | CREATES ARE UNAVAILABLE for {}".format(obj_type))
-        return update_object(obj_type=obj_type, obj_id=obj_id,
-                             parent_id=parent_id, field_to_update="type")
+        return update_object_user(obj_id=obj_id, parent_id=parent_id,)
 
     print(" * Test Data | Request: POST on /{}/".format(obj_type))
 
     data = stream_to_data_mapping(obj_type)
 
     if data:
-        if obj_type == 'lists':
+        if obj_type == 'lists' and parent_id: # TODO create separate 'create_object_lists' method
             data['idBoard'] = parent_id
 
         endpoint = get_url_string("post", obj_type)
@@ -242,12 +332,26 @@ def create_object(obj_type, obj_id: str = "", parent_id: str = ""):
 
         if resp.status_code >= 400:
             logging.warn("Request Failed {} \n    {}".format(resp.status_code, resp.text))
-            return resp
+            return None
 
         return resp.json()
 
     raise NotImplementedError
 
+def delete_object(obj_type, obj_id: str = "", parent_id: str = ""):
+    print(" * Test Data | Request: DELETE on /{}/".format(obj_type))
+    # TODO | WIP | do a delete for boards, then try for lists | can't delete actions or users
+
+    if not obj_id:
+        obj_id = get_random_object_id(obj_type)
+
+    endpoint = get_url_string("delete", obj_type, obj_id, parent_id)
+    resp = requests.delete(url=endpoint, headers=HEADERS, params=PARAMS)
+    if resp.status_code >= 400:
+        logging.warn("Request Failed {} \n    {}".format(resp.status_code, resp.text))
+        return None
+
+    return resp.json()
 
 ##########################################################################
 ### Testing the utils above
@@ -255,10 +359,12 @@ def create_object(obj_type, obj_id: str = "", parent_id: str = ""):
 if __name__ == "__main__":
     test_creates = False
     test_updates = False
-    test_gets = True
+    test_gets = False
+    test_deletes = True
+
     print_objects = True
 
-    objects_to_test = ['users'] # ['actions', 'cards', 'lists'] #'boards'
+    objects_to_test = ['actions'] # ['actions', 'cards', 'lists'] #'boards'
 
     print("********** Testing basic functions of utils **********")
     if test_creates:

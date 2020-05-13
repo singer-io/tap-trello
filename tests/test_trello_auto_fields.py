@@ -44,23 +44,21 @@ class TestTrelloAutomaticFields(unittest.TestCase):
         }
     def expected_check_streams(self):
         return {
+            'actions',
             'boards',
-            'users',
-            'lists'
+            'lists',
+            'users'
         }
 
     def expected_sync_streams(self):
-        return {
-            'boards',
-            'users',
-            'lists'
-        }
+        return self.expected_check_streams()
 
     def expected_pks(self):
         return {
-            "boards" : {"id"},
-            "users" : {"id"},
-            "lists" : {"id"}
+            'actions' : {"id"},
+            'boards' : {"id"},
+            'users' : {"id"},
+            'lists' : {"id"}
         }
 
     def expected_automatic_fields(self):

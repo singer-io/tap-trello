@@ -44,12 +44,14 @@ class TestTrelloStartDate(unittest.TestCase):
 
     def testable_streams(self): # Rip this if all streams testable
         return {
+            'actions',
             'boards',
             'lists',
             'users'
         }
     def expected_check_streams(self):
         return {
+            'actions',
             'boards',
             'lists',
             'users'
@@ -60,6 +62,7 @@ class TestTrelloStartDate(unittest.TestCase):
 
     def expected_pks(self):
         return {
+            "actions" : {"id"},
             "boards" : {"id"},
             "lists" : {"id"},
             "users" : {"id"}

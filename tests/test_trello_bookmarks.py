@@ -1,7 +1,10 @@
 import tap_tester.connections as connections
 import tap_tester.menagerie   as menagerie
 import tap_tester.runner      as runner
+import trello_utils as utils
+
 import os
+import logging
 import unittest
 from functools import reduce
 
@@ -30,6 +33,11 @@ class TrelloBookmarks(unittest.TestCase):
             'access_token_secret': os.getenv('TAP_TRELLO_ACCESS_TOKEN_SECRET'),
         }
 
+    def untestable_streams(self):
+        return {
+            'users',
+        }
+
     def expected_check_streams(self):
         return {
             'boards',
@@ -39,12 +47,7 @@ class TrelloBookmarks(unittest.TestCase):
         }
 
     def expected_sync_streams(self):
-        return {
-            'boards',
-            'users',
-            'lists',
-            'actions'
-        }
+        return self.expected_check_streams()
 
     def expected_full_table_sync_streams(self):
         return {
@@ -74,13 +77,34 @@ class TrelloBookmarks(unittest.TestCase):
 
     def get_properties(self):
         return {
-            'start_date' : '2020-03-01T00:00:00Z'
+            'start_date' : '2020-05-10T00:00:00Z'
         }
 
-    def test_run(self):
-        conn_id = connections.ensure_connection(self)
 
-        #run in check mode
+    def test_run(self):
+
+        # ensure data exists for sync streams and set expectations
+        expected_records_1 = {x: [] for x in self.expected_sync_streams()} # ids by stream
+        for stream in self.expected_incremental_sync_streams():
+            parent_stream = utils.get_parent_stream(stream)
+            _, existing_objects = utils.get_total_record_count_and_objects(parent_stream, stream)
+            if existing_objects:
+                logging.info("Data exists for stream: {}".format(stream))
+                for obj in existing_objects:  # add existing records to expectations
+                    expected_records_1[stream].append(
+                        {field: obj.get(field)
+                         for field in self.expected_automatic_fields().get(stream)}
+                    )
+                continue
+            # Create 1 record if none exist
+            logging.info("Data does not exist for stream: {}".format(stream))
+            new_object = utils.create_object(stream)
+            logging.info("Data generated for stream: {}".format(stream))
+            expected_records_1[stream].append({field: obj.get(field)
+                                               for field in self.expected_automatic_fields().get(stream)})
+
+        # run in check mode
+        conn_id = connections.ensure_connection(self)
         check_job_name = runner.run_check_mode(self, conn_id)
 
         #verify check  exit codes
@@ -119,49 +143,104 @@ class TrelloBookmarks(unittest.TestCase):
         exit_status = menagerie.get_exit_status(conn_id, sync_job_name)
         menagerie.verify_sync_exit_status(self, exit_status, sync_job_name)
 
-        first_record_count_by_stream = runner.examine_target_output_file(self, conn_id, self.expected_sync_streams(), self.expected_pks())
-        replicated_row_count =  reduce(lambda accum,c : accum + c, first_record_count_by_stream.values())
-        self.assertGreater(replicated_row_count, 0, msg="failed to replicate any data: {}".format(first_record_count_by_stream))
-        print("total replicated row count: {}".format(replicated_row_count))
+        # verify data was replicated
+        record_count_by_stream_1 = runner.examine_target_output_file(
+            self, conn_id, self.expected_sync_streams(), self.expected_pks()
+        )
+        replicated_row_count_1 =  reduce(lambda accum,c : accum + c, record_count_by_stream_1.values())
+        self.assertGreater(replicated_row_count, 0, msg="failed to replicate any data: {}".format(record_count_by_stream_1))
+        print("total replicated row count: {}".format(replicated_row_count_1))
 
         # Verify that automatic fields are all emitted with records
-        synced_records = runner.get_records_from_target_output()
-        for stream_name, data in synced_records.items():
-            record_messages = [set(row['data'].keys()) for row in data['messages']]
-            for record_keys in record_messages:
-                self.assertEqual(self.expected_automatic_fields().get(stream_name, set()) - record_keys, set())
+        synced_records_1 = runner.get_records_from_target_output()
+        # for stream_name, data in synced_records_1.items(): # TODO This can probably be removed, covered by auto_fields_test
+        #     record_messages = [set(row['data'].keys()) for row in data['messages']]
+        #     for record_keys in record_messages:
+        #         self.assertEqual(self.expected_automatic_fields().get(stream_name, set()) - record_keys, set())
 
-        # Verify bookmarks were saved for all streams
-        # TODO: No bookmarks for now, though `actions` at least will be
-        state = menagerie.get_state(conn_id)
-        # TODO: make more generic check for assertions in state
-        self.assertTrue(state.get('bookmarks', {}).get('actions', {}).get('window_start'))
-        #for stream in self.expected_sync_streams():
-        #    self.assertTrue(stream_states.get(stream))
+        # Verify bookmarks were saved for all streams # TODO this is not true though? Only actions...
+        state_1 = menagerie.get_state(conn_id)
+        for stream in self.expected_incremental_sync_streams():
+            self.assertTrue(state_1.get('bookmarks', {}).get(stream, {}).get('window_start', {}))
+        print("Bookmarks meet expectations")
 
-        print("Bookmarks are accurate, running second sync...")
-            
+        # Generate data between syncs for bookmarking streams
+        print("Generating more data prior to 2nd sync")
+        expected_records_2 = {x: [] for x in self.expected_sync_streams()}
+        for stream in self.expected_sync_streams().difference(self.untestable_streams()):
+            for _ in range(1):
+                new_object = utils.create_object(stream)
+                expected_records_2[stream].append({field: new_object.get(field)
+                                                   for field in self.expected_automatic_fields().get(stream)})
+
         # Run another sync
-        second_sync_job_name = runner.run_sync_mode(self, conn_id)
+        print("Running 2nd sync job")
+        sync_job_name_2 = runner.run_sync_mode(self, conn_id)
 
         #verify tap and target exit codes
-        exit_status = menagerie.get_exit_status(conn_id, sync_job_name)
-        menagerie.verify_sync_exit_status(self, exit_status, sync_job_name)
+        exit_status_2 = menagerie.get_exit_status(conn_id, sync_job_name_2)
+        menagerie.verify_sync_exit_status(self, exit_status_2, sync_job_name_2)
 
-        second_record_count_by_stream = runner.examine_target_output_file(self, conn_id, self.expected_sync_streams(), self.expected_pks())
-        for stream in self.expected_full_table_sync_streams():
-            record_count = second_record_count_by_stream.get(stream, 0)
-            # Assert we have enough data
-            self.assertGreater(record_count, 0)
-            # Assert that our bookmark works as expected
-            self.assertEqual(record_count, first_record_count_by_stream[stream])
-            # self.assertEqual(record_count, 1)
+        # verify data was replicated
+        record_count_by_stream_2 = runner.examine_target_output_file(
+            self, conn_id, self.expected_sync_streams(), self.expected_pks()
+        )
+        replicated_row_count_2 =  reduce(lambda accum,c : accum + c, record_count_by_stream_2.values())
+        self.assertGreater(replicated_row_count_2, 0,
+                           msg="failed to replicate any data: {}".format(record_count_by_stream_2))
+        print("total replicated row count: {}".format(replicated_row_count_2))
 
+        # Verify bookmarks were saved as expected inc streams
+        state_2 = menagerie.get_state(conn_id)
         for stream in self.expected_incremental_sync_streams():
-            record_count = second_record_count_by_stream.get(stream, 0)
-            # We aren't generating data between the two syncs, and the
-            # bookmark should be a little behind 'now', so the second sync
-            # should return no data
-            self.assertEqual(record_count, 0)
+            self.assertTrue(state_2.get('bookmarks', {}).get(stream, {}).get('window_start', {}))
+        print("Bookmarks meet expectations")
+
+        # TESTING FULL TABLE STREAMS
+        for stream in self.expected_full_table_sync_streams():
+            record_count_1 = record_count_by_stream_1.get(stream, 0)
+            record_count_2 = record_count_by_stream_2.get(stream, 0)
+
+            # Assert we have data for both syncs for full table streams
+            self.assertGreater(record_count_1, 0)
+            self.assertGreater(record_count_2, 0)
+
+            # Assert that we are capturing the expected number of records for full table streams
+            self.assertGreater(record_count_2, record_count_1,
+                               msg="Full table streams should have more data in second sync.")
+            self.assertEqual((record_count_2 - record_count_1),
+                             len(expected_records_2.get(stream, [])),
+                             msg="The differnce in record counts between syncs should " +\
+                             "equal the number of records we created between syncs.")
+
+            # Assert that we are capturing the expected records for full table streams
+
+        import pdb; pdb.set_trace()
+
+        print("ENDING TEST HERE FOR NOW.")
+
+        # TESTING INCREMENTAL STREAMS
+        for stream in self.expected_incremental_sync_streams():
+            record_count_1 = record_count_by_stream_1.get(stream, 0)
+            record_count_2 = record_count_by_stream_2.get(stream, 0)
+
+            # Assert we have data for both syncs for inc streams
+            self.assertGreater(record_count_1, 0)
+            self.assertGreater(record_count_2, 0)
+
+            # Assert that we are capturing the expected number of records for inc streams
+            self.assertEqual(record_count_1, len(expected_records_1.get(stream, [])))
+            self.assertEqual(record_count_2, len(expected_records_2.get(stream, [])))
+
+            # TODO Assert that we are capturing the expected records for inc streams
 
         print("Second sync record count is OK.")
+
+        # for stream in self.expected_incremental_sync_streams():
+        #     record_count = second_record_count_by_stream.get(stream, 0)
+        #     # We aren't generating data between the two syncs, and the
+        #     # bookmark should be a little behind 'now', so the second sync
+        #     # should return no data
+        #     self.assertEqual(record_count, len(expected_records_2.get(stream)))
+
+        # print("Second sync record count is OK.")

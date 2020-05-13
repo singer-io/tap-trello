@@ -44,13 +44,14 @@ class TestTrelloPagination(unittest.TestCase):
         : users: would need to manually create enough members to exceed API LIMIT
         """
         return {
+            'actions',
             'boards',
             'lists',
-            'users'
         }
 
     def expected_check_streams(self):
         return {
+            'actions',
             'boards',
             'lists',
             'users'
@@ -61,10 +62,10 @@ class TestTrelloPagination(unittest.TestCase):
 
     def expected_pks(self):
         return {
-            "boards" : {"id"},
-            "lists" : {"id"},
-            "users" : {"id"}
-
+            'actions' : {"id"},
+            'boards' : {"id"},
+            'lists' : {"id"},
+            'users' : {"id"}
         }
 
     def expected_automatic_fields(self):
@@ -100,15 +101,12 @@ class TestTrelloPagination(unittest.TestCase):
         highest_count = 0
 
         for obj in parent_objects:
-            if obj['name'] == "NEVER DELETE BOARD":
-                import pdb; pdb.set_trace()
             objects = utils.get_objects(obj_type=child_stream, parent_id=obj.get('id'))
 
             if len(objects) > highest_count:
                 highest_count = len(objects)
                 return_object = obj['id']
-        if child_stream == 'users':
-            import pdb; pdb.set_trace()
+
         return highest_count, return_object
 
     def test_run(self):
