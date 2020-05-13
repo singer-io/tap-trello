@@ -34,14 +34,28 @@ class TrelloBookmarks(unittest.TestCase):
         return {
             'boards',
             'users',
-            'lists'
+            'lists',
+            'actions'
         }
 
     def expected_sync_streams(self):
         return {
             'boards',
             'users',
+            'lists',
+            'actions'
+        }
+
+    def expected_full_table_sync_streams(self):
+        return {
+            'boards',
+            'users',
             'lists'
+        }
+
+    def expected_incremental_sync_streams(self):
+        return {
+            'actions'
         }
 
     def tap_name(self):
@@ -51,7 +65,8 @@ class TrelloBookmarks(unittest.TestCase):
         return {
             "boards" : {"id"},
             "users" : {"id"},
-            "lists" : {"id"}
+            "lists" : {"id"},
+            'actions' : {"id"}
         }
 
     def expected_automatic_fields(self):
@@ -119,7 +134,8 @@ class TrelloBookmarks(unittest.TestCase):
         # Verify bookmarks were saved for all streams
         # TODO: No bookmarks for now, though `actions` at least will be
         state = menagerie.get_state(conn_id)
-        self.assertEqual(state, {})
+        # TODO: make more generic check for assertions in state
+        self.assertTrue(state.get('bookmarks', {}).get('actions', {}).get('window_start'))
         #for stream in self.expected_sync_streams():
         #    self.assertTrue(stream_states.get(stream))
 
@@ -133,12 +149,19 @@ class TrelloBookmarks(unittest.TestCase):
         menagerie.verify_sync_exit_status(self, exit_status, sync_job_name)
 
         second_record_count_by_stream = runner.examine_target_output_file(self, conn_id, self.expected_sync_streams(), self.expected_pks())
-        for stream in self.expected_sync_streams():
+        for stream in self.expected_full_table_sync_streams():
             record_count = second_record_count_by_stream.get(stream, 0)
             # Assert we have enough data
             self.assertGreater(record_count, 0)
             # Assert that our bookmark works as expected
             self.assertEqual(record_count, first_record_count_by_stream[stream])
             # self.assertEqual(record_count, 1)
+
+        for stream in self.expected_incremental_sync_streams():
+            record_count = second_record_count_by_stream.get(stream, 0)
+            # We aren't generating data between the two syncs, and the
+            # bookmark should be a little behind 'now', so the second sync
+            # should return no data
+            self.assertEqual(record_count, 0)
 
         print("Second sync record count is OK.")
