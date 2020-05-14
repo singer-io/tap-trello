@@ -8,11 +8,6 @@ LOGGER = singer.get_logger()
 
 ENDPOINT_BASE = "https://api.trello.com/1"
 
-def should_giveup(e):
-    if e.response.status_code == 429:
-        LOGGER.info("Encountered 429, backing off exponentially")
-    return not e.response.status_code == 429
-
 class TrelloClient():
     def __init__(self, config):
         self.oauth = OAuth1(config['consumer_key'],
