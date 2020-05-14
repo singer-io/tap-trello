@@ -1,5 +1,6 @@
 import os
 import unittest
+import logging
 from datetime import datetime as dt
 from datetime import timedelta
 from functools import reduce
@@ -103,13 +104,25 @@ class TestTrelloStartDate(unittest.TestCase):
         self.START_DATE = self.get_properties().get('start_date')
 
         # ensure data exists for sync streams and set expectations
+        required_record_count = 3  # we want at least 3 existing records
         expected_records = {x: [] for x in self.expected_sync_streams()} # ids by stream
         for stream in self.testable_streams():
-            # for _ in range(3): # TODO improve method to check if any data exists, if not then create some
-            #     new_object = utils.create_object(stream)
-            #     expected_records[stream].append(new_object['id'])
-            # print("Data {} records generated for stream: {}".format(len(expected_records[stream]), stream))
-            print("skipping data creation")
+            record_count, existing_objects = utils.get_total_record_count_and_objects(stream)
+            if existing_objects and record_count >= required_record_count:
+                logging.info("Data exists for stream: {}".format(stream))
+                for obj in existing_objects:  # add existing records to expectations
+                    expected_records[stream].append(
+                        {field: obj.get(field)
+                         for field in self.expected_automatic_fields().get(stream)}
+                    )
+                continue
+            # Create more records if needed
+            logging.info("Sufficient data does not exist for stream: {}".format(stream))
+            for _ in range(required_record_count - record_count):
+                new_object = utils.create_object(stream)
+                logging.info("Record generated for stream: {}".format(stream))
+                expected_records[stream].append({field: obj.get(field)
+                                                 for field in self.expected_automatic_fields().get(stream)})
 
 
         ##########################################################################
@@ -171,7 +184,6 @@ class TestTrelloStartDate(unittest.TestCase):
                                       - timedelta(days=60), self.START_DATE_FORMAT)
         start_date_2 = self.START_DATE
         print("REPLAICATION START DATE CHANGE: {} ===>>> {} ".format(start_date_1, start_date_2))
-
 
         ##########################################################################
         ### Second Sync
@@ -271,3 +283,17 @@ class TestTrelloStartDate(unittest.TestCase):
                                  msg="Stream '{}' is {}\n".format(stream, self.FULL_TABLE) +
                                  "Expected sync with start date {} to have the same amount of records".format(start_date_2) +
                                  "than sync with start date {}. It does not.".format(start_date_1))
+
+        # CLEAN UP
+        stream_to_delete = 'boards'
+        boards_remaining = 5
+        print("Deleting all but {} records for stream {}.".format(boards_remaining, stream_to_delete))
+        board_count = len(expected_records.get(stream_to_delete, []))
+        for obj_to_delete in expected_records.get(stream_to_delete, []): # Delete all baords between syncs
+            if board_count > boards_remaining:
+                utils.delete_object(stream_to_delete, obj_to_delete.get('id'))
+                board_count -= 1
+            else:
+                break
+
+        print("\n\n---------- TODOs still present. Not all streams are fully tested ----------\n\n")

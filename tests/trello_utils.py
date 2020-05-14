@@ -9,6 +9,8 @@ from datetime import timedelta, date
 from datetime import datetime as dt
 from enum import Enum
 
+PARENT_OBJECTS = []
+NEVER_DELETE_BOARD_ID = "5eb080e9d9e0f56e8311ab5f"
 PARENT_STREAM = {
     'actions': 'boards',
     'boards': 'boards',
@@ -73,6 +75,17 @@ def get_objects(obj_type: str, obj_id: str = "", parent_id: str = ""):
 
 def get_random_object_id(obj_type: str):
     """Return the id of a random object for a specified object_type"""
+    global PARENT_OBJECTS
+
+    if obj_type == get_parent_stream(obj_type): # if boards
+        if not PARENT_OBJECTS: # if we have not already done a get on baords
+            PARENT_OBJECTS = get_objects(obj_type)
+
+        objects = PARENT_OBJECTS
+        random_object = objects[random.randint(0, len(objects) -1)]
+
+        return random_object.get('id')
+
     objects = get_objects(obj_type)
     random_object = objects[random.randint(0, len(objects) -1)]
 
@@ -130,17 +143,25 @@ def get_url_string(req: str, obj_type: str, obj_id: str = "", parent_id: str = "
     return url_string
 
 
-def get_total_record_count_and_objects(parent_stream: str, child_stream: str):
-    """Return the count and all records of a given child stream"""
-    parent_objects = get_objects(obj_type=parent_stream)
+def get_total_record_count_and_objects(child_stream: str=""):
+    """
+    : param child_stream: 
+    Return the count and all records of a given child stream
+    """
+    global PARENT_OBJECTS
+
+    parent_stream = get_parent_stream(child_stream)
+
+    if not PARENT_OBJECTS:
+        PARENT_OBJECTS = get_objects(obj_type=parent_stream)
 
     # If true, then this stream is top level so just need 1 get ^
     if parent_stream == child_stream:
-        return len(parent_objects), parent_objects
+        return len(PARENT_OBJECTS), PARENT_OBJECTS
 
     count = 0
     existing_objects = []
-    for obj in parent_objects:
+    for obj in PARENT_OBJECTS:
         objects = get_objects(obj_type=child_stream, parent_id=obj.get('id'))
         for obj in objects:
             already_tracked = False
@@ -165,8 +186,8 @@ def get_test_data():
     tstamp = dt.utcnow().timestamp() # this is used to genereate unique data
 
     TEST_DATA = {
-        "BOARDS": {"name": "Test Board {}".format(tstamp)},
-        "USERS": {"type": ""},  # TODO {"fullName":"xae a12","username":"singersongwriterd42"}
+        "BOARDS": {"name": "Board {}".format(tstamp)},
+        "USERS": {"type": ""},  # {"fullName":"xae a12","username":"singersongwriterd42"}
         "CARDS": {
             "name":"Card {}".format(tstamp),
             "desc": "This is a description.",
@@ -182,10 +203,10 @@ def get_test_data():
             "address": "", # For use with/by the Map Power-Up
             "locationName": "", #For use with/by the Map Power-Up
             "coordinates": "", # For use with/by the Map Power-Up. Should take the form latitude,longitude
-            "keepFromSource": "string", # If using idCardSource you can specify which properties to copy over. all or comma-separated list of: attachments,checklists,comments,due,labels,members,stickers. Style: form, Default: all. Valid values: all, attachments, checklists, comments, due, labels, members, stickers
+            "keepFromSource": "string", # If using idCardSource you can specify which properties to copy over.
         },
         "LISTS" : {
-            "name":"Card {}".format(tstamp),
+            "name":"List {}".format(tstamp),
             "idBoard": "{}".format(get_random_object_id('boards')),  # The long ID of the board the list should be created on
             "idListSource":"",  # ID of the List to copy into the new List
             "pos": "{}".format(random.choice(["top", "bottom", random.randint(1,20)])),  # card pos [top,bottom,positive float]
@@ -269,7 +290,7 @@ def get_action_fields_by_stream():
         'boards': ['name'],
     }
 
-# TODO add a parent id for updating child streams
+# TODO add a parent id for updating child streams if necessary
 def create_object_actions(recipient_stream: str = "boards", obj_id: str = ""):
     """
     method for generating specifc actions
@@ -303,6 +324,45 @@ def create_object_actions(recipient_stream: str = "boards", obj_id: str = ""):
 
     raise NotImplementedError
     
+def create_object_boards(obj_type: str='boards'):
+    global PARENT_OBJECTS
+    print(" * Test Data | Request: POST on /{}/".format(obj_type))
+
+    data = stream_to_data_mapping(obj_type)
+    if data:
+        endpoint = get_url_string("post", obj_type)
+        resp = requests.post(url=endpoint, headers=HEADERS, params=PARAMS, json=data)
+
+        if resp.status_code >= 400:
+            logging.warn("Request Failed {} \n    {}".format(resp.status_code, resp.text))
+            return None
+
+        print(" * Test Data | Tracking {} object in PARENT_OBJECTS".format(obj_type))
+        PARENT_OBJECTS.append(resp.json())
+
+        return resp.json()
+
+    raise NotImplementedError
+
+def create_object_lists(obj_type: str='lists', parent_id=''):
+    print(" * Test Data | Request: POST on /{}/".format(obj_type))
+
+    data = stream_to_data_mapping(obj_type)
+    if data:
+        if parent_id: # if not specified it will grab a random parent_id
+            data['idBoard'] = parent_id
+
+        endpoint = get_url_string("post", obj_type)
+        resp = requests.post(url=endpoint, headers=HEADERS, params=PARAMS, json=data)
+
+        if resp.status_code >= 400:
+            logging.warn("Request Failed {} \n    {}".format(resp.status_code, resp.text))
+            return None
+
+        return resp.json()
+
+    raise NotImplementedError
+
 def create_object(obj_type, obj_id: str = "", parent_id: str = ""):
     """
     Create a single record for a given object
@@ -313,11 +373,18 @@ def create_object(obj_type, obj_id: str = "", parent_id: str = ""):
 
     return that object or none if create fails
     """
-    if obj_type == 'actions':
+    if obj_type == 'boards':
+        return create_object_boards()
+
+    elif obj_type == 'actions':
         print(" * Test Data | DIRECT CREATES ARE UNAVAILABLE for {}. ".format(obj_type) +\
               "UPDATING another stream to generate new record")
         return create_object_actions('boards', obj_id=parent_id)
-    if obj_type == 'users':
+
+    elif obj_type == 'lists':
+        return create_object_lists(parent_id=parent_id)
+
+    elif obj_type == 'users':
         print(" * Test Data | CREATES ARE UNAVAILABLE for {}".format(obj_type))
         return update_object_user(obj_id=obj_id, parent_id=parent_id,)
 
@@ -326,8 +393,6 @@ def create_object(obj_type, obj_id: str = "", parent_id: str = ""):
     data = stream_to_data_mapping(obj_type)
 
     if data:
-        if obj_type == 'lists' and parent_id: # TODO create separate 'create_object_lists' method
-            data['idBoard'] = parent_id
 
         endpoint = get_url_string("post", obj_type)
         resp = requests.post(url=endpoint, headers=HEADERS, params=PARAMS, json=data)
@@ -344,8 +409,16 @@ def delete_object(obj_type, obj_id: str = "", parent_id: str = ""):
     print(" * Test Data | Request: DELETE on /{}/".format(obj_type))
     # TODO | WIP | do a delete for boards, then try for lists | can't delete actions or users
 
+    # Don't delete that one board we don't want to delete because all users are on it
     if not obj_id:
-        obj_id = get_random_object_id(obj_type)
+        attempts = 0
+        while not obj_id and (obj_id != NEVER_DELETE_BOARD_ID) and attempts < 50:
+            obj_id = get_random_object_id(obj_type)
+            attempts += 1
+    elif obj_id == NEVER_DELETE_BOARD_ID:
+        logging.warn("Request Ignored |  You tried to delete a board that other tests rely on |  " +\
+                     "Board (id={}) should not be deleted".format(NEVER_DELETE_BOARD_ID))
+        return None
 
     endpoint = get_url_string("delete", obj_type, obj_id, parent_id)
     resp = requests.delete(url=endpoint, headers=HEADERS, params=PARAMS)
@@ -362,11 +435,11 @@ if __name__ == "__main__":
     test_creates = False
     test_updates = False
     test_gets = False
-    test_deletes = True
+    test_deletes = False
 
     print_objects = True
 
-    objects_to_test = ['actions'] # ['actions', 'cards', 'lists'] #'boards'
+    objects_to_test = ['boards'] # ['actions', 'cards', 'lists'] #'boards'
 
     print("********** Testing basic functions of utils **********")
     if test_creates:
@@ -399,4 +472,13 @@ if __name__ == "__main__":
                     print(existing_objs)
                 continue
             print("FAILED")
-
+    if test_deletes:
+        for obj in objects_to_test:
+            print("Testing DELETE: {}".format(obj))
+            deleted_obj = delete_object(obj)
+            if deleted_obj:
+                print("SUCCESS")
+                if print_objects:
+                    print(deleted_obj)
+                continue
+            print("FAILED")

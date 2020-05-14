@@ -6,11 +6,15 @@ import trello_utils as utils
 import os
 import unittest
 import logging
+from datetime import datetime as dt
+from datetime import timedelta
 from functools import reduce
 
 
 class TestTrelloAutomaticFields(unittest.TestCase):
     """Test that with no fields selected for a stream automatic fields are still replicated"""
+    START_DATE = ""
+    START_DATE_FORMAT = "%Y-%m-%dT00:00:00Z"
 
     def setUp(self):
         missing_envs = [x for x in [
@@ -39,7 +43,7 @@ class TestTrelloAutomaticFields(unittest.TestCase):
     def testable_streams(self):
         return {
             'boards',
-            'users',
+            # 'users', # TODO see BUG below
             'lists'
         }
     def expected_check_streams(self):
@@ -70,41 +74,8 @@ class TestTrelloAutomaticFields(unittest.TestCase):
 
     def get_properties(self):
         return {
-            'start_date' : '2020-03-01T00:00:00Z'
+            'start_date' : dt.strftime(dt.utcnow(), self.START_DATE_FORMAT),  # set to utc today
         }
-
-    def get_parent_stream(self):
-        return {
-            "boards": "boards",
-            "users": "boards",
-            "lists": "boards"
-        }
-
-    def get_total_record_count_and_objects(self, parent_stream: str, child_stream: str):
-        """Return the count and all records of a given child stream"""
-        parent_objects = utils.get_objects(obj_type=parent_stream)
-
-        # If true, then this stream is top level so just need 1 get ^
-        if parent_stream == child_stream:
-            return len(parent_objects), parent_objects
-
-        count = 0
-        existing_objects = []
-
-        for obj in parent_objects:
-            objects = utils.get_objects(obj_type=child_stream, parent_id=obj.get('id'))
-            for obj in objects:
-                already_tracked = False
-                for e_obj in existing_objects:
-                    if obj['id'] == e_obj['id']:
-                        already_tracked = True
-                        break
-                if not already_tracked:
-                    existing_objects.append(obj)
-
-            count += len(objects)
-
-        return count, existing_objects
 
     def test_run(self):
         """
@@ -120,9 +91,7 @@ class TestTrelloAutomaticFields(unittest.TestCase):
         expected_records = {x: [] for x in self.expected_sync_streams()} # ids by stream
         #for stream in self.get_expected_sync_streams():
         for stream in self.testable_streams():
-            parent_stream = self.get_parent_stream().get(stream)
-            _, existing_objects = self.get_total_record_count_and_objects(parent_stream, stream)
-
+            _, existing_objects = utils.get_total_record_count_and_objects(stream)
             if existing_objects:
                 logging.info("Data exists for stream: {}".format(stream))
                 for obj in existing_objects:
@@ -215,10 +184,34 @@ class TestTrelloAutomaticFields(unittest.TestCase):
 
                 # TODO this assertion below is invalid for 'users',
                 # must update self.expected_automatic_fields() once auto fields with board_id for 'users'
+                # must put 'users' back into self.testable_streams()
                 # BUG (https://stitchdata.atlassian.net/browse/SRCE-3080)
 
                 # verify by values
                 actual_records = [row['data'] for row in data['messages']]
-                self.assertEqual(expected_records[stream],
-                                 actual_records,
-                                 msg="Actual values do match expectations")
+                for actual_record in actual_records:
+                    self.assertTrue(actual_record in expected_records.get(stream),
+                                    msg="Actual record missing from expectations")
+                for expected_record in expected_records.get(stream):
+                    self.assertTrue(expected_record in actual_records,
+                                    msg="Expected record missing from target.")
+
+                # Verify the number of records match expectations
+                self.assertEqual(len(expected_records.get(stream)),
+                                 len(actual_records),
+                                 msg="Number of actual records do match expectations. " +\
+                                 "We probably have duplicate records.")
+
+        # CLEAN UP
+        stream_to_delete = 'boards'
+        boards_remaining = 5
+        print("Deleting all but {} records for stream {}.".format(boards_remaining, stream_to_delete))
+        board_count = len(expected_records.get(stream_to_delete, []))
+        for obj_to_delete in expected_records.get(stream_to_delete, []): # Delete all baords between syncs
+            if board_count > boards_remaining:
+                utils.delete_object(stream_to_delete, obj_to_delete.get('id'))
+                board_count -= 1
+            else:
+                break
+
+        print("---------- TODOs still present. Not all streams are fully tested ----------")

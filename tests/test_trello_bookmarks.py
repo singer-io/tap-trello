@@ -90,9 +90,8 @@ class TrelloBookmarks(unittest.TestCase):
 
         # ensure data exists for sync streams and set expectations
         expected_records_1 = {x: [] for x in self.expected_sync_streams()} # ids by stream
-        for stream in self.expected_incremental_sync_streams():
-            parent_stream = utils.get_parent_stream(stream)
-            _, existing_objects = utils.get_total_record_count_and_objects(parent_stream, stream)
+        for stream in self.expected_sync_streams().difference(self.untestable_streams()):
+            _, existing_objects = utils.get_total_record_count_and_objects(stream)
             if existing_objects:
                 logging.info("Data exists for stream: {}".format(stream))
                 for obj in existing_objects:  # add existing records to expectations
@@ -126,7 +125,6 @@ class TrelloBookmarks(unittest.TestCase):
         print("discovered schemas are OK")
 
         #select all catalogs
-
         for c in found_catalogs:
             catalog_entry = menagerie.get_annotated_schema(conn_id, c['stream_id'])
 
@@ -137,7 +135,6 @@ class TrelloBookmarks(unittest.TestCase):
                 self.assertTrue(mdata and mdata['metadata']['inclusion'] == 'automatic')
 
             connections.select_catalog_and_fields_via_metadata(conn_id, c, catalog_entry)
-
             
         #clear state
         menagerie.set_state(conn_id, {})
@@ -158,12 +155,8 @@ class TrelloBookmarks(unittest.TestCase):
 
         # Verify that automatic fields are all emitted with records
         synced_records_1 = runner.get_records_from_target_output()
-        # for stream_name, data in synced_records_1.items(): # TODO This can probably be removed, covered by auto_fields_test
-        #     record_messages = [set(row['data'].keys()) for row in data['messages']]
-        #     for record_keys in record_messages:
-        #         self.assertEqual(self.expected_automatic_fields().get(stream_name, set()) - record_keys, set())
 
-        # Verify bookmarks were saved for all streams # TODO this is not true though? Only actions...
+        # Verify bookmarks were saved for all streams
         state_1 = menagerie.get_state(conn_id)
         for stream in self.expected_incremental_sync_streams():
             self.assertTrue(state_1.get('bookmarks', {}).get(stream, {}).get('window_start', {}))
@@ -254,8 +247,24 @@ class TrelloBookmarks(unittest.TestCase):
                                  msg="Stream {} replicated an unexpedted number records on 2nd sync.".format(stream))
 
                 # TODO Assert that we are capturing the expected records for inc streams
-
         print("Incremental streams tested.")
 
-        # TODO Add delete method as test cleanup
-        print("---------- TODOs still present. Not all streams are fully tested ----------")
+        # CLEANING UP
+        stream_to_delete = 'boards'
+        boards_remaining = 5
+        print("Deleting all but {} records for stream {}.".format(boards_remaining, stream_to_delete))
+        board_count = len(expected_records_1.get(stream_to_delete, [])) + len(expected_records_2.get(stream_to_delete, []))
+        for obj_to_delete in expected_records_2.get(stream_to_delete, []): # Delete all baords between syncs
+            if board_count > boards_remaining:
+                utils.delete_object(stream_to_delete, obj_to_delete.get('id'))
+                board_count -= 1
+            else:
+                break
+        for obj_to_delete in expected_records_1.get(stream_to_delete, []): # Delete all baords between syncs
+            if board_count > boards_remaining:
+                utils.delete_object(stream_to_delete, obj_to_delete.get('id'))
+                board_count -= 1
+            else:
+                break
+
+        print("\n\n---------- TODOs still present. Not all streams are fully tested ----------\n\n")
