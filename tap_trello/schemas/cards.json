@@ -192,8 +192,10 @@
         },
         "checkItemsEarliestDue": {
           "type": [
-            "null"
-          ]
+            "null",
+            "string"
+          ],
+          'format": "date-time"
         },
         "comments": {
           "type": [
