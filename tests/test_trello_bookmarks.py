@@ -36,7 +36,8 @@ class TrelloBookmarks(unittest.TestCase):
             'users',
             'lists',
             'actions',
-            'cards'
+            'cards',
+            'checklists'
         }
 
     def expected_sync_streams(self):
@@ -45,7 +46,8 @@ class TrelloBookmarks(unittest.TestCase):
             'users',
             'lists',
             'actions',
-            'cards'
+            'cards',
+            'checklists'
         }
 
     def expected_full_table_sync_streams(self):
@@ -53,7 +55,8 @@ class TrelloBookmarks(unittest.TestCase):
             'boards',
             'users',
             'lists',
-            'cards'
+            'cards',
+            'checklists'
         }
 
     def expected_incremental_sync_streams(self):
@@ -70,7 +73,8 @@ class TrelloBookmarks(unittest.TestCase):
             'users' : {'id'},
             'lists' : {'id'},
             'actions' : {'id'},
-            'cards' : {'id'}
+            'cards' : {'id'},
+            'checklists': {'id'}
         }
 
     def expected_automatic_fields(self):
