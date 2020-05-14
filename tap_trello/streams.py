@@ -83,6 +83,7 @@ class DateWindowPaginated(Mixin):
     state = None
     client = None
     MAX_API_RESPONSE_SIZE = None
+    params = {}
 
     def _get_window_state(self):
         window_start = singer.get_bookmark(self.state, self.stream_id, 'window_start')
@@ -123,10 +124,10 @@ class DateWindowPaginated(Mixin):
         window_start -= timedelta(milliseconds=1) # To make start inclusive
 
         if sub_window_end is not None:
-            for rec in self._paginate_window(window_start, sub_window_end, format_values, params):
+            for rec in self._paginate_window(window_start, sub_window_end, format_values):
                 yield rec
         else:
-            for rec in self._paginate_window(window_start, window_end, format_values, params):
+            for rec in self._paginate_window(window_start, window_end, format_values):
                 yield rec
 
 
@@ -135,13 +136,12 @@ class DateWindowPaginated(Mixin):
             self.state, self.stream_id, key, utils.strftime(value)
         )
 
-    def _paginate_window(self, window_start, window_end, format_values, params):
+    def _paginate_window(self, window_start, window_end, format_values):
         sub_window_end = window_end
         while True:
             records = self.client.get(self._format_endpoint(format_values), params={"since": utils.strftime(window_start), # pylint: disable=no-member
                                                                                     "before": utils.strftime(sub_window_end),
-                                                                                    "limit": self.MAX_API_RESPONSE_SIZE,
-                                                                                    **params})
+                                                                                    **self.params})
             with OrderChecker("DESC") as oc:
                 for rec in records:
                     oc.check_order(rec["date"])
@@ -176,6 +176,7 @@ class Stream:
     replication_method = None
     _last_bookmark_value = None
     MAX_API_RESPONSE_SIZE = None
+    params = {}
 
     def __init__(self, client, config, state):
         self.client = client
@@ -190,9 +191,9 @@ class Stream:
         return self.endpoint.format(*format_values)
 
 
-    def get_records(self, format_values, params=None):
-        if params is None:
-            params = {}
+    def get_records(self, format_values, additional_params=None):
+        if additional_params is None:
+            additional_params = {}
 
         # Boards, Users, and Lists don't handle an api limit key
         # Passing in None doesn't change the response (no 400 returned)
@@ -200,7 +201,8 @@ class Stream:
             self._format_endpoint(format_values),
             params={
                 "limit": self.MAX_API_RESPONSE_SIZE,
-                **params
+                **self.params,
+                **additional_params
             })
 
         if self.MAX_API_RESPONSE_SIZE and len(records) >= self.MAX_API_RESPONSE_SIZE:
@@ -228,7 +230,7 @@ class ChildStream(Stream):
         LOGGER.info("%s - Retrieving IDs of parent stream: %s",
                     self.stream_id,
                     self.parent_class.stream_id)
-        for parent_obj in parent.get_records(parent.get_format_values(), params={"fields": "id"}):
+        for parent_obj in parent.get_records(parent.get_format_values(), additional_params={"fields": "id"}):
             yield parent_obj['id']
 
     def _sort_parent_ids_by_created(self, parent_ids): # pylint: disable=no-self-use
@@ -311,6 +313,7 @@ class Actions(DateWindowPaginated, ChildStream):
     replication_method = "INCREMENTAL"
     parent_class = Boards
     MAX_API_RESPONSE_SIZE = 1000
+    params = {'limit': 1000}
 
 class Cards(ChildStream):
     stream_id = "cards"
@@ -320,6 +323,16 @@ class Cards(ChildStream):
     replication_method = "FULL_TABLE"
     parent_class = Boards
     MAX_API_RESPONSE_SIZE = 20000
+    params = {'limit': 20000}
+
+class Checklists(ChildStream):
+    stream_id = "checklists"
+    stream_name = "checklists"
+    endpoint = "/boards/{}/checklists"
+    key_properties = ["id"]
+    replication_method = "FULL_TABLE"
+    parent_class = Boards
+    params = {'fields': 'all', 'checkItem_fields': 'all'}
 
 
 STREAM_OBJECTS = {
@@ -327,5 +340,6 @@ STREAM_OBJECTS = {
     'users': Users,
     'lists': Lists,
     'actions': Actions,
-    'cards': Cards
+    'cards': Cards,
+    'checklists': Checklists
 }
