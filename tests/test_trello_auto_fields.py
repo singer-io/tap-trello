@@ -50,6 +50,7 @@ class TestTrelloAutomaticFields(unittest.TestCase):
         return {
             'actions',
             'boards',
+            'cards',
             'lists',
             'users'
         }
@@ -60,6 +61,7 @@ class TestTrelloAutomaticFields(unittest.TestCase):
     def expected_pks(self):
         return {
             'actions' : {"id"},
+            'cards' : {'id'},
             'boards' : {"id"},
             'users' : {"id"},
             'lists' : {"id"}

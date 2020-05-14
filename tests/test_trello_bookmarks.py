@@ -42,6 +42,7 @@ class TrelloBookmarks(unittest.TestCase):
     def untestable_streams(self):
         return {
             'users',
+            'cards'
         }
 
     def expected_check_streams(self):

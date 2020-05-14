@@ -54,6 +54,7 @@ class TestTrelloStartDate(unittest.TestCase):
         return {
             'actions',
             'boards',
+            'cards',
             'lists',
             'users'
         }
@@ -65,6 +66,7 @@ class TestTrelloStartDate(unittest.TestCase):
         return {
             "actions" : {"id"},
             "boards" : {"id"},
+            'cards' : {'id'},
             "lists" : {"id"},
             "users" : {"id"}
         }

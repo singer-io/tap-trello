@@ -17,6 +17,13 @@ PARENT_STREAM = {
     'lists': 'boards',
     'users': 'boards'
 }
+MAX_API_LIMIT = 1000 # this is the smallest
+# MAX_API_LIMIT = {
+#     'actions': 1000
+#     'boards': 50,
+#     'lists': 50,
+#     'users': 50
+# }
 REPLICATION_METHOD = {
     'actions': 'INCREMENTAL',
     'boards': 'FULL_TABLE',
@@ -35,6 +42,7 @@ HEADERS = {
 PARAMS = (
     ('key', '{}'.format(os.getenv('TAP_TRELLO_CONSUMER_KEY'))),
     ('token', '{}'.format(os.getenv('TAP_TRELLO_TESTING_TOKEN'))),
+    ('limit', '{}'.format(MAX_API_LIMIT))
 )
 #    ('before',)
 #    ('since',)

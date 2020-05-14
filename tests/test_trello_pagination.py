@@ -80,23 +80,9 @@ class TestTrelloPagination(unittest.TestCase):
             'start_date' : '2020-03-01T00:00:00Z'
         }
 
-    def get_total_record_count_and_objects(self, parent_stream: str, child_stream: str):
-        """Return the count and all records of a given child stream"""
-        parent_objects = utils.get_objects(obj_type=parent_stream)
-        count = 0
-        existing_objects = set()
-
-        for obj in parent_objects:
-            objects = utils.get_objects(obj_type=child_stream, parent_id=obj.get('id'))
-            existing_objects.update({obj['id'] for obj in objects})
-            count += len(objects)
-            print("{} {}".format(obj.get('name'), len(objects)))
-
-        return count, existing_objects
-
     def get_highest_record_count_and_parent_obj_id(self, parent_stream: str, child_stream: str):
         """Return the parent object id with the largest record cound for child objects"""
-        parent_objects = utils.get_objects(obj_type=parent_stream)
+        parent_objects = utils.get_total_record_count_and_objects(parent_stream)
         return_object = ""
         highest_count = 0
 
