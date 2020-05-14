@@ -57,6 +57,7 @@ def get_replication_method(stream):
     raise NotImplementedError(
         "The expected replication method for {} has not been not set".format(stream)
     )
+
 def get_parent_stream(stream):
     if stream in PARENT_STREAM.keys():
         return PARENT_STREAM.get(stream)
@@ -64,6 +65,7 @@ def get_parent_stream(stream):
     raise NotImplementedError(
         "The expected replication method for {} has not been not set".format(stream)
     )
+
 def get_objects(obj_type: str, obj_id: str = "", parent_id: str = ""):
     """
     get all objects for a given object

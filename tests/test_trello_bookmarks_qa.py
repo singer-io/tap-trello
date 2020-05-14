@@ -11,7 +11,7 @@ import tap_tester.runner      as runner
 import trello_utils as utils
 
 
-class TrelloBookmarks(unittest.TestCase):
+class TrelloBookmarksQA(unittest.TestCase):
     START_DATE = ""
     START_DATE_FORMAT = "%Y-%m-%dT00:00:00Z"
 
@@ -26,7 +26,7 @@ class TrelloBookmarks(unittest.TestCase):
             raise Exception("Missing environment variables: {}".format(missing_envs))
 
     def name(self):
-        return "tap_tester_trello_bookmarks"
+        return "tap_tester_trello_bookmarks_qa"
 
     def get_type(self):
         return "platform.trello"

@@ -74,7 +74,6 @@ class TestTrelloPagination(unittest.TestCase):
     def tap_name(self):
         return "tap-trello"
 
-
     def get_properties(self):
         return {
             'start_date' : '2020-03-01T00:00:00Z'
