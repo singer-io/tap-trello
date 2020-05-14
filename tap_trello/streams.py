@@ -140,6 +140,7 @@ class DateWindowPaginated(Mixin):
         while True:
             records = self.client.get(self._format_endpoint(format_values), params={"since": utils.strftime(window_start), # pylint: disable=no-member
                                                                                     "before": utils.strftime(sub_window_end),
+                                                                                    "limit": self.MAX_API_RESPONSE_SIZE,
                                                                                     **params})
             with OrderChecker("DESC") as oc:
                 for rec in records:
