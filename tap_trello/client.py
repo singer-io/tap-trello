@@ -2,10 +2,16 @@ import requests
 from requests_oauthlib import OAuth1
 
 import singer
+import backoff
 
 LOGGER = singer.get_logger()
 
 ENDPOINT_BASE = "https://api.trello.com/1"
+
+def should_giveup(e):
+    if e.response.status_code == 429:
+        LOGGER.info("Encountered 429, backing off exponentially")
+    return not e.response.status_code == 429
 
 class TrelloClient():
     def __init__(self, config):
@@ -19,6 +25,10 @@ class TrelloClient():
     def _get_member_id(self):
         return self.get('/members/me')['id']
 
+    @backoff.on_exception(backoff.constant,
+                          (requests.exceptions.HTTPError),
+                          max_tries=3,
+                          interval=10)
     def _make_request(self, method, endpoint, headers=None, params=None):
         full_url = ENDPOINT_BASE + endpoint
         LOGGER.info(
