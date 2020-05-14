@@ -34,6 +34,8 @@ PARAMS = (
     ('key', '{}'.format(os.getenv('TAP_TRELLO_CONSUMER_KEY'))),
     ('token', '{}'.format(os.getenv('TAP_TRELLO_TESTING_TOKEN'))),
 )
+#    ('before',)
+#    ('since',)
 
 ##########################################################################
 ### Utils for retrieving existing test data 
@@ -312,8 +314,8 @@ def create_object(obj_type, obj_id: str = "", parent_id: str = ""):
     return that object or none if create fails
     """
     if obj_type == 'actions':
-        print(" * Test Data | DIRECT CREATES ARE UNAVAILABLE for {}. " +\
-              "UPDATING another stream to generate new record".format(obj_type))
+        print(" * Test Data | DIRECT CREATES ARE UNAVAILABLE for {}. ".format(obj_type) +\
+              "UPDATING another stream to generate new record")
         return create_object_actions('boards', obj_id=parent_id)
     if obj_type == 'users':
         print(" * Test Data | CREATES ARE UNAVAILABLE for {}".format(obj_type))
