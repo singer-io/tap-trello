@@ -195,7 +195,7 @@
             "null",
             "string"
           ],
-          'format": "date-time"
+          "format": "date-time"
         },
         "comments": {
           "type": [
