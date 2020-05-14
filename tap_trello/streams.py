@@ -82,6 +82,7 @@ class DateWindowPaginated(Mixin):
     config = None
     state = None
     client = None
+    MAX_API_RESPONSE_SIZE = None
 
     def _get_window_state(self):
         window_start = singer.get_bookmark(self.state, self.stream_id, 'window_start')
@@ -139,13 +140,14 @@ class DateWindowPaginated(Mixin):
         while True:
             records = self.client.get(self._format_endpoint(format_values), params={"since": utils.strftime(window_start), # pylint: disable=no-member
                                                                                     "before": utils.strftime(sub_window_end),
+                                                                                    "limit": self.MAX_API_RESPONSE_SIZE,
                                                                                     **params})
             with OrderChecker("DESC") as oc:
                 for rec in records:
                     oc.check_order(rec["date"])
                     yield rec
 
-            if len(records) >= MAX_API_RESPONSE_SIZE:
+            if len(records) >= self.MAX_API_RESPONSE_SIZE:
                 LOGGER.info("%s - Paginating within date_window %s to %s, due to max records being received.",
                             self.stream_id,
                             utils.strftime(window_start), utils.strftime(sub_window_end))
@@ -173,6 +175,7 @@ class Stream:
     replication_keys = []
     replication_method = None
     _last_bookmark_value = None
+    MAX_API_RESPONSE_SIZE = None
 
     def __init__(self, client, config, state):
         self.client = client
@@ -190,9 +193,25 @@ class Stream:
     def get_records(self, format_values, params=None):
         if params is None:
             params = {}
-        records = self.client.get(self._format_endpoint(format_values), params=params)
 
-        return records
+        # Boards, Users, and Lists don't handle an api limit key
+        # Passing in None doesn't change the response (no 400 returned)
+        records = self.client.get(
+            self._format_endpoint(format_values),
+            params={
+                "limit": self.MAX_API_RESPONSE_SIZE,
+                **params
+            })
+
+        if self.MAX_API_RESPONSE_SIZE and len(records) >= self.MAX_API_RESPONSE_SIZE:
+            raise Exception(
+                ("{}: Number of records returned is greater than max API response size of {}.").format(
+                    self.stream_id,
+                    self.MAX_API_RESPONSE_SIZE)
+            )
+
+        for rec in records:
+            yield rec
 
 
     def sync(self):
@@ -291,6 +310,16 @@ class Actions(DateWindowPaginated, ChildStream):
     key_properties = ["id"]
     replication_method = "INCREMENTAL"
     parent_class = Boards
+    MAX_API_RESPONSE_SIZE = 1000
+
+class Cards(ChildStream):
+    stream_id = "cards"
+    stream_name = "cards"
+    endpoint = "/boards/{}/cards/all"
+    key_properties = ["id"]
+    replication_method = "FULL_TABLE"
+    parent_class = Boards
+    MAX_API_RESPONSE_SIZE = 20000
 
 
 STREAM_OBJECTS = {
@@ -298,4 +327,5 @@ STREAM_OBJECTS = {
     'users': Users,
     'lists': Lists,
     'actions': Actions,
+    'cards': Cards
 }
