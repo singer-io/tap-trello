@@ -196,12 +196,12 @@ class TestTrelloAutomaticFields(unittest.TestCase):
 
                 # verify by values
                 actual_records = [row['data'] for row in data['messages']]
-                 if stream == 'cards': # BUG (https://stitchdata.atlassian.net/browse/SRCE-3094)
-                     continue # COMMWENT OUT to see failure
-                     # UNCOMMENT BELOW to look at difference in expectations and actual
-                     # print("Actual: {}".format(actual_records))
-                     # print("Expected: {}".format(expected_records))
-                     # import pdb; pdb.set_trace()
+                if stream == 'cards': # BUG (https://stitchdata.atlassian.net/browse/SRCE-3094)
+                    continue # COMMWENT OUT to see failure
+                    # UNCOMMENT BELOW to look at difference in expectations and actual
+                    # print("Actual: {}".format(actual_records))
+                    # print("Expected: {}".format(expected_records))
+                    # import pdb; pdb.set_trace()
                 for actual_record in actual_records:
                     self.assertTrue(actual_record in expected_records.get(stream),
                                     msg="Actual record missing from expectations")
