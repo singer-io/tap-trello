@@ -47,6 +47,7 @@ class TestTrelloStartDate(unittest.TestCase):
         return {
             'actions',
             'boards',
+            'cards',
             'lists',
             'users'
         }
@@ -174,7 +175,8 @@ class TestTrelloStartDate(unittest.TestCase):
         menagerie.verify_sync_exit_status(self, exit_status_1, sync_job_1)
 
         # read target output
-        record_count_by_stream_1 = runner.examine_target_output_file(self, conn_id, self.expected_sync_streams(), self.expected_pks())
+        record_count_by_stream_1 = runner.examine_target_output_file(self, conn_id,
+                                                                     self.expected_sync_streams(), self.expected_pks())
         replicated_row_count_1 =  reduce(lambda accum,c : accum + c, record_count_by_stream_1.values())
         self.assertGreater(replicated_row_count_1, 0, msg="failed to replicate any data: {}".format(record_count_by_stream_1))
         print("total replicated row count: {}".format(replicated_row_count_1))
@@ -235,7 +237,8 @@ class TestTrelloStartDate(unittest.TestCase):
         menagerie.verify_sync_exit_status(self, exit_status_2, sync_job_2)
 
         # This should be validating the the PKs are written in each record
-        record_count_by_stream_2 = runner.examine_target_output_file(self, conn_id, self.expected_sync_streams(), self.expected_pks())
+        record_count_by_stream_2 = runner.examine_target_output_file(self, conn_id,
+                                                                     self.expected_sync_streams(), self.expected_pks())
         replicated_row_count_2 =  reduce(lambda accum,c : accum + c, record_count_by_stream_2.values(), 0)
         self.assertGreater(replicated_row_count_2, 0, msg="failed to replicate any data: {}".format(record_count_by_stream_2))
         print("total replicated row count: {}".format(replicated_row_count_2))

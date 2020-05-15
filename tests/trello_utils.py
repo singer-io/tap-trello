@@ -3,7 +3,7 @@
 import os
 import json
 import requests
-import backoff
+# import backoff # TODO add backoff if necessary
 import random
 import logging
 from datetime import timedelta, date
@@ -18,18 +18,21 @@ PARENT_STREAM = {
     'actions': 'boards',
     'boards': 'boards',
     'lists': 'boards',
+    'cards': 'boards',
     'users': 'boards'
 }
 MAX_API_LIMIT = 1000 # this is the smallest
 # MAX_API_LIMIT = {
 #     'actions': 1000
-#     'boards': 50,
-#     'lists': 50,
-#     'users': 50
+#     'boards': None,
+#     'cards': 20000,
+#     'lists': None,
+#     'users': None
 # }
 REPLICATION_METHOD = {
     'actions': 'INCREMENTAL',
     'boards': 'FULL_TABLE',
+    'cards': 'FULL_TABLE',
     'lists': 'FULL_TABLE',
     'users': 'FULL_TABLE'
 }
@@ -47,8 +50,6 @@ PARAMS = (
     ('token', '{}'.format(os.getenv('TAP_TRELLO_TESTING_TOKEN'))),
     ('limit', '{}'.format(MAX_API_LIMIT))
 )
-#    ('before',)
-#    ('since',)
 
 ##########################################################################
 ### Utils for retrieving existing test data 
@@ -69,11 +70,6 @@ def get_parent_stream(stream):
         "The expected replication method for {} has not been not set".format(stream)
     )
 
-# @backoff.on_exception(backoff.expo,
-#                       (stripe_client.error.InvalidRequestError),
-#                       max_tries=2,
-#                       factor=2,
-#                       jitter=None)
 def get_objects(obj_type: str, obj_id: str = "", parent_id: str = ""):
     """
     get all objects for a given object
@@ -94,7 +90,7 @@ def get_objects(obj_type: str, obj_id: str = "", parent_id: str = ""):
 
 def get_random_object_id(obj_type: str):
     """Return the id of a random object for a specified object_type"""
-    global PARENT_OBJECTS, LIST_OBJECTS
+    global PARENT_OBJECTS  #, LIST_OBJECTS
 
     if obj_type == get_parent_stream(obj_type): # if boards
         if not PARENT_OBJECTS: # if we have not already done a get on baords
@@ -150,11 +146,11 @@ def get_url_string(req: str, obj_type: str, obj_id: str = "", parent_id: str = "
     elif obj_type == 'actions':
         url_string += "/boards/{}/actions/{}".format(parent_id, obj_id)
 
-    # elif obj_type == 'cards':
-    #     if req == "get":
-    #         url_string += "/boards/{}/cards/{}".format(parent_id, obj_id)
-    #     else:
-    #         url_string += "/cards/{}".format(obj_id)
+    elif obj_type == 'cards':
+        if req == "get":
+            url_string += "/boards/{}/cards/{}".format(parent_id, obj_id)
+        else:
+            url_string += "/cards/{}".format(obj_id)
 
     elif obj_type == 'lists':
         if req == 'get' or 'delete':
@@ -393,6 +389,23 @@ def create_object_lists(obj_type: str='lists', parent_id=''):
 
     raise NotImplementedError
 
+def create_object_cards(obj_type: str='cards', parent_id=''):
+    print(" * Test Data | Request: POST on /{}/".format(obj_type))
+
+    data = stream_to_data_mapping(obj_type)
+    if data:
+
+        endpoint = get_url_string("post", obj_type)
+        resp = requests.post(url=endpoint, headers=HEADERS, params=PARAMS, json=data)
+
+        if resp.status_code >= 400:
+            logging.warn("Request Failed {} \n    {}".format(resp.status_code, resp.text))
+            return None
+
+        return resp.json()
+
+    raise NotImplementedError
+
 def create_object(obj_type, obj_id: str = "", parent_id: str = ""):
     """
     Create a single record for a given object
@@ -403,13 +416,16 @@ def create_object(obj_type, obj_id: str = "", parent_id: str = ""):
 
     return that object or none if create fails
     """
-    if obj_type == 'boards':
-        return create_object_boards()
-
-    elif obj_type == 'actions':
+    if obj_type == 'actions':
         print(" * Test Data | DIRECT CREATES ARE UNAVAILABLE for {}. ".format(obj_type) +\
               "UPDATING another stream to generate new record")
         return create_object_actions('boards', obj_id=parent_id)
+
+    elif obj_type == 'boards':
+        return create_object_boards()
+
+    elif obj_type == 'cards':
+        return create_object_cards(parent_id=parent_id)
 
     elif obj_type == 'lists':
         return create_object_lists(parent_id=parent_id)
@@ -461,7 +477,7 @@ def delete_object(obj_type, obj_id: str = "", parent_id: str = ""):
     sleep(5)
     return resp.json()
 
-def reset_tracked_parent_objects():
+def reset_tracked_parent_objects():  # TODO Reset all tracked data if we end up tracking child streams
     global PARENT_OBJECTS
     PARENT_OBJECTS = ""
     print(" * Test Data | RESETTING TRACKED PARENT OBJECTS")
@@ -478,7 +494,7 @@ if __name__ == "__main__":
 
     print_objects = True
 
-    objects_to_test = ['boards'] # ['actions', 'cards', 'lists'] #'boards'
+    objects_to_test = ['cards'] # ['actions', 'boards', 'cards', 'lists', 'users']
 
     print("********** Testing basic functions of utils **********")
     if test_creates:

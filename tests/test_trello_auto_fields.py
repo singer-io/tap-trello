@@ -43,8 +43,9 @@ class TestTrelloAutomaticFields(unittest.TestCase):
     def testable_streams(self):
         return {
             'boards',
-            # 'users', # TODO see BUG below
-            'lists'
+            'cards',
+            'lists',
+            # 'users' # TODO see BUG below
         }
     def expected_check_streams(self):
         return {
@@ -186,7 +187,7 @@ class TestTrelloAutomaticFields(unittest.TestCase):
                         msg="Expected automatic fields and nothing else.")
                     continue
 
-                # TODO this assertion below is invalid for 'users',
+                # TODO the assertion below is invalid for 'users',
                 # must update self.expected_automatic_fields() once auto fields with board_id for 'users'
                 # must put 'users' back into self.testable_streams()
                 # BUG (https://stitchdata.atlassian.net/browse/SRCE-3080)

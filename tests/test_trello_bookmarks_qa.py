@@ -42,16 +42,15 @@ class TrelloBookmarksQA(unittest.TestCase):
     def untestable_streams(self):
         return {
             'users',
-            'cards'
         }
 
     def expected_check_streams(self):
         return {
-            'boards',
-            'users',
-            'lists',
             'actions',
-            'cards'
+            'boards',
+            'cards',
+            'lists',
+            'users'
         }
 
     def expected_sync_streams(self):
@@ -60,9 +59,9 @@ class TrelloBookmarksQA(unittest.TestCase):
     def expected_full_table_sync_streams(self):
         return {
             'boards',
-            'users',
+            'cards',
             'lists',
-            'cards'
+            'users',
         }
 
     def expected_incremental_sync_streams(self):
