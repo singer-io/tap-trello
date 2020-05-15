@@ -27,7 +27,7 @@ class TestTrelloAutomaticFields(unittest.TestCase):
             raise Exception("Missing environment variables: {}".format(missing_envs))
 
     def name(self):
-        return "tap_tester_trello_no_fields_test"
+        return "tap_tester_trello_auto_fields_test"
 
     def get_type(self):
         return "platform.trello"
@@ -89,6 +89,8 @@ class TestTrelloAutomaticFields(unittest.TestCase):
         fetch of data.  For instance if you have a limit of 250 records ensure
         that 251 (or more) records have been posted for that stream.
         """
+        print("\n\nRUNNING {}\n\n".format(self.name()))
+
         # ensure data exists for sync streams and set expectations
         expected_records = {x: [] for x in self.expected_sync_streams()} # ids by stream
         #for stream in self.get_expected_sync_streams():
@@ -216,4 +218,10 @@ class TestTrelloAutomaticFields(unittest.TestCase):
             else:
                 break
 
+        # Reset the parent objects that we have been tracking
+        utils.reset_tracked_parent_objects()
         print("---------- TODOs still present. Not all streams are fully tested ----------")
+
+
+if __name__ == '__main__':
+    unittest.main()

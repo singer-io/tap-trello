@@ -102,6 +102,8 @@ class TestTrelloStartDate(unittest.TestCase):
         fetch of data.  For instance if you have a limit of 250 records ensure
         that 251 (or more) records have been posted for that stream.
         """
+        print("\n\nRUNNING {}\n\n".format(self.name()))
+
         # Initialize start date prior to first sync
         self.START_DATE = self.get_properties().get('start_date')
 
@@ -110,13 +112,14 @@ class TestTrelloStartDate(unittest.TestCase):
         expected_records = {x: [] for x in self.expected_sync_streams()} # ids by stream
         for stream in self.testable_streams():
             record_count, existing_objects = utils.get_total_record_count_and_objects(stream)
-            if existing_objects and record_count >= required_record_count:
+            if existing_objects:
                 logging.info("Data exists for stream: {}".format(stream))
                 for obj in existing_objects:  # add existing records to expectations
                     expected_records[stream].append(
                         {field: obj.get(field)
                          for field in self.expected_automatic_fields().get(stream)}
                     )
+            if record_count >= required_record_count:
                 continue
             # Create more records if needed
             logging.info("Sufficient data does not exist for stream: {}".format(stream))
@@ -298,4 +301,10 @@ class TestTrelloStartDate(unittest.TestCase):
             else:
                 break
 
+        # Reset the parent objects that we have been tracking
+        utils.reset_tracked_parent_objects()
         print("\n\n---------- TODOs still present. Not all streams are fully tested ----------\n\n")
+
+
+if __name__ == '__main__':
+    unittest.main()

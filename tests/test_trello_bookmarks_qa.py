@@ -91,6 +91,7 @@ class TrelloBookmarksQA(unittest.TestCase):
         }
 
     def test_run(self):
+        print("\n\nRUNNING {}\n\n".format(self.name()))
 
         # ensure data exists for sync streams and set expectations
         expected_records_1 = {x: [] for x in self.expected_sync_streams()} # ids by stream
@@ -270,5 +271,10 @@ class TrelloBookmarksQA(unittest.TestCase):
                 board_count -= 1
             else:
                 break
-
+        # Reset the parent objects that we have been tracking
+        utils.reset_tracked_parent_objects()
         print("\n\n---------- TODOs still present. Not all streams are fully tested ----------\n\n")
+
+
+if __name__ == '__main__':
+    unittest.main()

@@ -6,13 +6,16 @@ import trello_utils as utils
 import os
 import unittest
 import logging
+from datetime import timedelta, date
+from datetime import datetime as dt
 from functools import reduce
 
 
 class TestTrelloPagination(unittest.TestCase):
     """Test that we are paginating for streams when exceeding the API record limit of a single query"""
-
-    API_LIMIT = 50
+    START_DATE = ""
+    START_DATE_FORMAT = "%Y-%m-%dT00:00:00Z"
+    API_LIMIT = 1000
 
     def setUp(self):
         missing_envs = [x for x in [
@@ -45,14 +48,13 @@ class TestTrelloPagination(unittest.TestCase):
         """
         return {
             'actions',
-            'boards',
-            'lists',
         }
 
     def expected_check_streams(self):
         return {
             'actions',
             'boards',
+            'cards',
             'lists',
             'users'
         }
@@ -64,6 +66,7 @@ class TestTrelloPagination(unittest.TestCase):
         return {
             'actions' : {"id"},
             'boards' : {"id"},
+            'cards' : {"id"},
             'lists' : {"id"},
             'users' : {"id"}
         }
@@ -76,19 +79,21 @@ class TestTrelloPagination(unittest.TestCase):
 
     def get_properties(self):
         return {
-            'start_date' : '2020-03-01T00:00:00Z'
+            'start_date' : dt.strftime(dt.utcnow() - timedelta(days=5), self.START_DATE_FORMAT),  # set to utc today
         }
 
-    def get_highest_record_count_and_parent_obj_id(self, parent_stream: str, child_stream: str):
+    def get_highest_record_count_by_parent_obj_id(self, parent_stream: str, child_stream: str):
         """Return the parent object id with the largest record cound for child objects"""
-        parent_objects = utils.get_total_record_count_and_objects(parent_stream)
+        parent_record_count, parent_objects = utils.get_total_record_count_and_objects(parent_stream)
         return_object = ""
         highest_count = 0
 
         for obj in parent_objects:
             objects = utils.get_objects(obj_type=child_stream, parent_id=obj.get('id'))
 
-            if len(objects) > highest_count:
+            # Don't return the NEVER DELETE board even if it has the most records, we want to change
+            # this baord as LITTLE AS POSSIBLE
+            if len(objects) > highest_count and obj['id'] != utils.NEVER_DELETE_BOARD_ID:
                 highest_count = len(objects)
                 return_object = obj['id']
 
@@ -104,21 +109,34 @@ class TestTrelloPagination(unittest.TestCase):
         fetch of data.  For instance if you have a limit of 250 records ensure
         that 251 (or more) records have been posted for that stream.
         """
+        print("\n\nRUNNING {}\n\n".format(self.name()))
 
         # Ensure tested streams have a record count which exceeds the API LIMIT
-        #expected_records = {x: [] for x in self.expected_sync_streams()} # ids by stream # TODO See NOTE below
+        expected_records = {x: [] for x in self.expected_sync_streams()} # ids by stream
         final_count = {x: 0 for x in self.expected_sync_streams()}
         for stream in self.testable_streams(): # just actions at the moment
+            # Look for parent object with most number of stream records
             parent_stream = utils.get_parent_stream(stream)
-            record_count, parent_id = self.get_highest_record_count_and_parent_obj_id(parent_stream, stream)
+            record_count, parent_id = self.get_highest_record_count_by_parent_obj_id(parent_stream, stream)
+
+            if record_count > 0: # If we do have data already add it to expectations
+                logging.info("Data exists for stream: {}".format(stream))
+                existing_objects = utils.get_objects(obj_type=stream, parent_id=parent_id)
+                assert record_count == len(existing_objects), "TEST ISSUE | referencing wrong parent obj."
+                for obj in existing_objects:
+                    expected_records[stream].append(
+                        {field: obj.get(field)
+                         for field in self.expected_automatic_fields().get(stream)}
+                    )
+
             if record_count <= self.API_LIMIT:
                 logging.info("Not enough data to paginate : {} has {} records".format(stream, record_count))
                 while record_count <= self.API_LIMIT:
                     new_object = utils.create_object(obj_type=stream, parent_id=parent_id)
                     record_count += 1
                     logging.info("Record Created: {} has {} records".format(stream, record_count))
-                    # expected_records[stream].append(new_object['id'])
-                    # NOTE: If we want exact records ^ will need to some work to find the action id that was just created
+                    expected_records[stream].append({field: new_object.get(field)
+                                                     for field in self.expected_automatic_fields().get(stream)})
                 final_count[stream] = record_count
                 logging.info("FINAL RECORD COUNT: {} has {} records".format(stream, final_count[stream]))
 
@@ -126,8 +144,6 @@ class TestTrelloPagination(unittest.TestCase):
                 # If we are failing here, it is most likely an issue with /tests/trello_utils.py
                 self.assertGreater(final_count[stream], self.API_LIMIT,
                                    msg="Failed to create sufficient data prior to sync.")
-
-                continue
 
         conn_id = connections.ensure_connection(self)
 
@@ -186,7 +202,6 @@ class TestTrelloPagination(unittest.TestCase):
                 data = synced_records.get(stream, [])
                 record_messages_keys = [set(row['data'].keys()) for row in data['messages']]
 
-
                 for actual_keys in record_messages_keys:
 
                     # Verify that the automatic fields are sent to the target for paginated streams
@@ -200,3 +215,11 @@ class TestTrelloPagination(unittest.TestCase):
 
                     # TODO Get more specific with this assertion ^ genereate an exact list of expected_keys?
                     #      This may be unnecessary? If not, see auto fields test for implementation.
+
+
+        # Reset the parent objects that we have been tracking
+        utils.reset_tracked_parent_objects()
+
+
+if __name__ == '__main__':
+    unittest.main()

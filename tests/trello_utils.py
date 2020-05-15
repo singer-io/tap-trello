@@ -3,13 +3,16 @@
 import os
 import json
 import requests
+import backoff
 import random
 import logging
 from datetime import timedelta, date
 from datetime import datetime as dt
-from enum import Enum
+from time import sleep
+
 
 PARENT_OBJECTS = []
+LIST_OBJECTS = []
 NEVER_DELETE_BOARD_ID = "5eb080e9d9e0f56e8311ab5f"
 PARENT_STREAM = {
     'actions': 'boards',
@@ -66,6 +69,11 @@ def get_parent_stream(stream):
         "The expected replication method for {} has not been not set".format(stream)
     )
 
+# @backoff.on_exception(backoff.expo,
+#                       (stripe_client.error.InvalidRequestError),
+#                       max_tries=2,
+#                       factor=2,
+#                       jitter=None)
 def get_objects(obj_type: str, obj_id: str = "", parent_id: str = ""):
     """
     get all objects for a given object
@@ -78,6 +86,7 @@ def get_objects(obj_type: str, obj_id: str = "", parent_id: str = ""):
 
     if resp.status_code >= 400:
         logging.warn("Request Failed {} \n    {}".format(resp.status_code, resp.text))
+
         return None
 
     return resp.json()
@@ -85,7 +94,7 @@ def get_objects(obj_type: str, obj_id: str = "", parent_id: str = ""):
 
 def get_random_object_id(obj_type: str):
     """Return the id of a random object for a specified object_type"""
-    global PARENT_OBJECTS
+    global PARENT_OBJECTS, LIST_OBJECTS
 
     if obj_type == get_parent_stream(obj_type): # if boards
         if not PARENT_OBJECTS: # if we have not already done a get on baords
@@ -95,6 +104,11 @@ def get_random_object_id(obj_type: str):
         random_object = objects[random.randint(0, len(objects) -1)]
 
         return random_object.get('id')
+
+    # elif obj_type == 'lists': # TODO may need toadd this so we don't make too many calls on lists
+    #     if not LIST_OBJECTS: # if we have not already done a get on baords
+    #         LIST_OBJECTS = get_objects(obj_type)
+    #     objects = LIST_OBJECTS
 
     objects = get_objects(obj_type)
     random_object = objects[random.randint(0, len(objects) -1)]
@@ -300,18 +314,24 @@ def get_action_fields_by_stream():
         'boards': ['name'],
     }
 
-# TODO add a parent id for updating child streams if necessary
 def create_object_actions(recipient_stream: str = "boards", obj_id: str = ""):
     """
     method for generating specifc actions
-    : param obj_id: id of action object
-    : param parent_id: id of parent object (this will most likely be a board) # TODO may not need??
+    : param obj_id: id of parent stream object
     : param recipient_stream: stream to update in order to genereate an action, important to track for setting expectations
 
     return the new actions object that was just completed
     """
     if not obj_id:
-        obj_id = get_random_object_id(recipient_stream)
+        attempts = 0
+        while not obj_id or (obj_id == NEVER_DELETE_BOARD_ID) and attempts < 50:
+            obj_id = get_random_object_id(recipient_stream)
+            attempts += 1
+
+    if obj_id == NEVER_DELETE_BOARD_ID:
+        logging.warn("Request Ignored |  You tried to change a board that other tests rely on |  " +\
+                     "Board (id={}) should not be altered".format(NEVER_DELETE_BOARD_ID))
+        raise Exception("We do not have enough boards. We are being forced to update board named 'NEVER DELETE'")
 
     pot_fields_to_update = get_action_fields_by_stream().get(recipient_stream)
     field_to_update = pot_fields_to_update[random.randint(0, len(pot_fields_to_update) - 1)]
@@ -422,10 +442,11 @@ def delete_object(obj_type, obj_id: str = "", parent_id: str = ""):
     # Don't delete that one board we don't want to delete because all users are on it
     if not obj_id:
         attempts = 0
-        while not obj_id and (obj_id != NEVER_DELETE_BOARD_ID) and attempts < 50:
+        while not obj_id or (obj_id == NEVER_DELETE_BOARD_ID and attempts < 50):
             obj_id = get_random_object_id(obj_type)
             attempts += 1
-    elif obj_id == NEVER_DELETE_BOARD_ID:
+
+    if obj_id == NEVER_DELETE_BOARD_ID:
         logging.warn("Request Ignored |  You tried to delete a board that other tests rely on |  " +\
                      "Board (id={}) should not be deleted".format(NEVER_DELETE_BOARD_ID))
         return None
@@ -436,7 +457,15 @@ def delete_object(obj_type, obj_id: str = "", parent_id: str = ""):
         logging.warn("Request Failed {} \n    {}".format(resp.status_code, resp.text))
         return None
 
+    #trim_parent_objects(obj_id) # we want to track when a PARENT OBJECT has been removed
+    sleep(5)
     return resp.json()
+
+def reset_tracked_parent_objects():
+    global PARENT_OBJECTS
+    PARENT_OBJECTS = ""
+    print(" * Test Data | RESETTING TRACKED PARENT OBJECTS")
+    return
 
 ##########################################################################
 ### Testing the utils above
