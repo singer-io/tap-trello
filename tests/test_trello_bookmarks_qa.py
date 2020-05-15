@@ -108,7 +108,7 @@ class TrelloBookmarksQA(unittest.TestCase):
             logging.info("Data does not exist for stream: {}".format(stream))
             new_object = utils.create_object(stream)
             logging.info("Data generated for stream: {}".format(stream))
-            expected_records_1[stream].append({field: obj.get(field)
+            expected_records_1[stream].append({field: new_object.get(field)
                                                for field in self.expected_automatic_fields().get(stream)})
 
         # run in check mode

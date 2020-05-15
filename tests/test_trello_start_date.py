@@ -127,7 +127,7 @@ class TestTrelloStartDate(unittest.TestCase):
             for _ in range(required_record_count - record_count):
                 new_object = utils.create_object(stream)
                 logging.info("Record generated for stream: {}".format(stream))
-                expected_records[stream].append({field: obj.get(field)
+                expected_records[stream].append({field: new_object.get(field)
                                                  for field in self.expected_automatic_fields().get(stream)})
 
 

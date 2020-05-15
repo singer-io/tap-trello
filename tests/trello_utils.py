@@ -101,10 +101,10 @@ def get_random_object_id(obj_type: str):
 
         return random_object.get('id')
 
-    # elif obj_type == 'lists': # TODO may need toadd this so we don't make too many calls on lists
-    #     if not LIST_OBJECTS: # if we have not already done a get on baords
-    #         LIST_OBJECTS = get_objects(obj_type)
-    #     objects = LIST_OBJECTS
+    # elif obj_type == 'lists':
+    # if not LIST_OBJECTS: # if we have not already done a get on baords
+        #     LIST_OBJECTS = get_objects(obj_type)
+        # objects = LIST_OBJECTS
 
     objects = get_objects(obj_type)
     random_object = objects[random.randint(0, len(objects) -1)]
