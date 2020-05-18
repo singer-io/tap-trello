@@ -190,6 +190,9 @@ class Stream:
         return self.endpoint.format(*format_values)
 
 
+    def modify_record(self, record, **kwargs): # pylint: disable=no-self-use,unused-argument
+        return record
+
     def get_records(self, format_values, params=None):
         if params is None:
             params = {}
@@ -211,12 +214,19 @@ class Stream:
             )
 
         for rec in records:
-            yield rec
+            yield self.modify_record(rec, parent_id_list = format_values)
 
 
     def sync(self):
         for rec in self.get_records(self.get_format_values()):
             yield rec
+
+class AddBoardId(Mixin):
+    def modify_record(self, record, **kwargs): # pylint: disable=no-self-use
+        boardIdList = kwargs['parent_id_list']
+        assert len(boardIdList) == 1
+        record["boardId"] = boardIdList[0]
+        return record
 
 
 class ChildStream(Stream):
@@ -281,13 +291,13 @@ class Boards(Unsortable, Stream):
         return [self.client.member_id]
 
 
-class Users(Unsortable, ChildStream):
+class Users(Unsortable, AddBoardId, ChildStream):
     # TODO: If a user is added to a board, does the board's dateLastActivity get updated?
     # TODO: Should this assoc the board_id to the user records? Seems pretty useless without it
     stream_id = "users"
     stream_name = "users"
     endpoint = "/boards/{}/members"
-    key_properties = ["id"]
+    key_properties = ["id", "boardId"]
     replication_method = "FULL_TABLE"
     parent_class = Boards
 

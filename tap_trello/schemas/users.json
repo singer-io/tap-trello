@@ -6,7 +6,11 @@
   "properties": {
     "id": {
       "type": [
-        "null",
+        "string"
+      ]
+    },
+    "boardId": {
+      "type": [
         "string"
       ]
     },
