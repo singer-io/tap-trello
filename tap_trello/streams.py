@@ -115,11 +115,8 @@ class DateWindowPaginated(Mixin):
         singer.clear_bookmark(self.state, self.stream_id, "window_end")
         singer.write_state(self.state)
 
-    def get_records(self, format_values, params=None):
+    def get_records(self, format_values):
         """ Overrides the default get_records to provide date_window pagination and bookmarking. """
-        if params is None:
-            params = {}
-
         window_start, sub_window_end, window_end = self._get_window_state()
         window_start -= timedelta(milliseconds=1) # To make start inclusive
 
