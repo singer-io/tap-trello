@@ -958,7 +958,8 @@
       "properties": {
         "idAttachment": {
           "type": [
-            "null"
+            "null",
+            "string"
           ]
         },
         "color": {
@@ -1036,7 +1037,8 @@
           },
           "idMember": {
             "type": [
-              "null"
+              "null",
+              "string"
             ]
           },
           "id": {
