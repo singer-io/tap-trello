@@ -70,12 +70,37 @@ def get_parent_stream(stream):
         "The expected replication method for {} has not been not set".format(stream)
     )
 
+def get_objects_users(obj_type: str='users', obj_id: str = "", parent_id: str = ""):
+    """Get all members on a specific parent object, add that parent obj_id to the returned resp."""
+    print(" * Test Data |  Request: GET on /{}/{}".format(obj_type, obj_id))
+
+    if not parent_id: # needs to execute here so we can grab the board_id for the ret_val
+        parent_id = get_random_object_id('boards')
+
+    endpoint = get_url_string("get", obj_type, obj_id, parent_id)
+    resp = requests.get(url=endpoint, headers=HEADERS, params=PARAMS)
+
+    if resp.status_code >= 400:
+        logging.warn("Request Failed {} \n    {}".format(resp.status_code, resp.text))
+
+        return None
+
+    # Add baord id as tap-defined field 'boardId'
+    user_objects = resp.json()
+    for user in user_objects:
+        user['boardId'] = parent_id
+
+    return user_objects
+
 def get_objects(obj_type: str, obj_id: str = "", parent_id: str = ""):
     """
     get all objects for a given object
     -  or -
     get a specific obj by id
    """
+    if obj_type == 'users': # Dispatch b/c this requires additional logic
+        return get_objects_users(obj_id=obj_id, parent_id=parent_id)
+
     print(" * Test Data |  Request: GET on /{}/{}".format(obj_type, obj_id))
     endpoint = get_url_string("get", obj_type, obj_id, parent_id)
     resp = requests.get(url=endpoint, headers=HEADERS, params=PARAMS)
@@ -148,7 +173,10 @@ def get_url_string(req: str, obj_type: str, obj_id: str = "", parent_id: str = "
 
     elif obj_type == 'cards':
         if req == "get":
-            url_string += "/boards/{}/cards/{}".format(parent_id, obj_id)
+            if obj_id:
+                url_string += "/boards/{}/cards/{}".format(parent_id, obj_id)
+            else:
+                url_string += "/boards/{}/cards/".format(parent_id)
         else:
             url_string += "/cards/{}".format(obj_id)
 
@@ -186,7 +214,7 @@ def get_total_record_count_and_objects(child_stream: str=""):
         for obj in objects:
             already_tracked = False
             for e_obj in existing_objects:
-                if obj['id'] == e_obj['id']:
+                if obj['id'] == e_obj['id'] and child_stream != 'users':
                     already_tracked = True
                     break
             if not already_tracked:
@@ -489,12 +517,12 @@ def reset_tracked_parent_objects():  # TODO Reset all tracked data if we end up 
 if __name__ == "__main__":
     test_creates = False
     test_updates = False
-    test_gets = False
+    test_gets = True
     test_deletes = False
 
     print_objects = True
 
-    objects_to_test = ['cards'] # ['actions', 'boards', 'cards', 'lists', 'users']
+    objects_to_test = ['users'] # ['actions', 'boards', 'cards', 'lists', 'users']
 
     print("********** Testing basic functions of utils **********")
     if test_creates:

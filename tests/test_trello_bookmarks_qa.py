@@ -75,7 +75,7 @@ class TrelloBookmarksQA(unittest.TestCase):
     def expected_pks(self):
         return {
             'boards' : {'id'},
-            'users' : {'id'},
+            'users' : {'id', "boardId"},
             'lists' : {'id'},
             'actions' : {'id'},
             'cards' : {'id'}

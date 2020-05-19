@@ -68,7 +68,7 @@ class TestTrelloPagination(unittest.TestCase):
             'boards' : {"id"},
             'cards' : {"id"},
             'lists' : {"id"},
-            'users' : {"id"}
+            'users' : {"id", "boardId"}
         }
 
     def expected_automatic_fields(self):

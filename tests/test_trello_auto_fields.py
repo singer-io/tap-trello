@@ -45,7 +45,7 @@ class TestTrelloAutomaticFields(unittest.TestCase):
             'boards',
             'cards',
             'lists',
-            # 'users' # TODO see BUG below
+            'users'
         }
     def expected_check_streams(self):
         return {
@@ -62,10 +62,10 @@ class TestTrelloAutomaticFields(unittest.TestCase):
     def expected_pks(self):
         return {
             'actions' : {"id"},
-            'cards' : {'id'},
             'boards' : {"id"},
-            'users' : {"id"},
-            'lists' : {"id"}
+            'cards' : {'id'},
+            'lists' : {"id"},
+            'users' : {"id", "boardId"}
         }
 
     def expected_automatic_fields(self):
@@ -189,19 +189,8 @@ class TestTrelloAutomaticFields(unittest.TestCase):
                         msg="Expected automatic fields and nothing else.")
                     continue
 
-                # TODO the assertion below is invalid for 'users',
-                # must update self.expected_automatic_fields() once auto fields with board_id for 'users'
-                # must put 'users' back into self.testable_streams()
-                # BUG (https://stitchdata.atlassian.net/browse/SRCE-3080)
-
                 # verify by values
                 actual_records = [row['data'] for row in data['messages']]
-                if stream == 'cards': # BUG (https://stitchdata.atlassian.net/browse/SRCE-3094)
-                    continue # COMMWENT OUT to see failure
-                    # UNCOMMENT BELOW to look at difference in expectations and actual
-                    # print("Actual: {}".format(actual_records))
-                    # print("Expected: {}".format(expected_records))
-                    # import pdb; pdb.set_trace()
                 for actual_record in actual_records:
                     self.assertTrue(actual_record in expected_records.get(stream),
                                     msg="Actual record missing from expectations")
