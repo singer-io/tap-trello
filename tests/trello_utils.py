@@ -176,7 +176,7 @@ def get_url_string(req: str, obj_type: str, obj_id: str = "", parent_id: str = "
             if obj_id:
                 url_string += "/boards/{}/cards/{}".format(parent_id, obj_id)
             else:
-                url_string += "/boards/{}/cards/".format(parent_id)
+                url_string += "/boards/{}/cards/all".format(parent_id)
         else:
             url_string += "/cards/{}".format(obj_id)
 
