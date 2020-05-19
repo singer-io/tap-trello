@@ -803,7 +803,6 @@
     "pos": {
       "type": [
         "null",
-        "integer",
         "number"
       ]
     },
@@ -1067,7 +1066,7 @@
           "pos": {
             "type": [
               "null",
-              "integer"
+              "number"
             ]
           },
           "creationMethod": {
