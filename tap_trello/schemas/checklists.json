@@ -68,7 +68,8 @@
             },
             "due": {
               "type": [
-                "null"
+                "null",
+                "string"
               ]
             }
           }
@@ -275,12 +276,14 @@
         },
         "avatarHash": {
           "type": [
-            "null"
+            "null",
+            "string"
           ]
         },
         "avatarUrl": {
           "type": [
-            "null"
+            "null",
+            "string"
           ]
         },
         "fullName": {
@@ -291,7 +294,8 @@
         },
         "idMemberReferrer": {
           "type": [
-            "null"
+            "null",
+            "string"
           ]
         },
         "initials": {
@@ -322,7 +326,8 @@
     },
     "descData": {
       "type": [
-        "null"
+        "null",
+        "string"
       ]
     },
     "closed": {
@@ -339,7 +344,8 @@
     },
     "idEnterprise": {
       "type": [
-        "null"
+        "null",
+        "string"
       ]
     },
     "limits": {
@@ -386,7 +392,8 @@
     },
     "pinned": {
       "type": [
-        "null"
+        "null",
+        "string"
       ]
     },
     "shortLink": {
@@ -403,7 +410,8 @@
     },
     "datePluginDisable": {
       "type": [
-        "null"
+        "null",
+        "string"
       ]
     },
     "creationMethod": {
@@ -414,7 +422,8 @@
     },
     "ixUpdate": {
       "type": [
-        "null"
+        "null",
+        "string"
       ]
     },
     "enterpriseOwned": {
@@ -425,7 +434,8 @@
     },
     "idBoardSource": {
       "type": [
-        "null"
+        "null",
+        "string"
       ]
     },
     "starred": {
@@ -700,7 +710,8 @@
     },
     "templateGallery": {
       "type": [
-        "null"
+        "null",
+        "string"
       ]
     },
     "memberships": {
@@ -749,12 +760,14 @@
     },
     "checkItemStates": {
       "type": [
-        "null"
+        "null",
+        "string"
       ]
     },
     "dueReminder": {
       "type": [
-        "null"
+        "null",
+        "string"
       ]
     },
     "idBoard": {
@@ -777,7 +790,8 @@
     },
     "idAttachmentCover": {
       "type": [
-        "null"
+        "null",
+        "string"
       ]
     },
     "manualCoverAttachment": {
@@ -877,7 +891,8 @@
         },
         "checkItemsEarliestDue": {
           "type": [
-            "null"
+            "null",
+            "string"
           ]
         },
         "comments": {
@@ -949,12 +964,14 @@
         },
         "color": {
           "type": [
-            "null"
+            "null",
+            "string"
           ]
         },
         "idUploadedBackground": {
           "type": [
-            "null"
+            "null",
+            "string"
           ]
         },
         "size": {
@@ -985,7 +1002,8 @@
     },
     "softLimit": {
       "type": [
-        "null"
+        "null",
+        "string"
       ]
     },
     "idCard": {
@@ -1036,12 +1054,14 @@
           },
           "nameData": {
             "type": [
-              "null"
+              "null",
+              "string"
             ]
           },
           "type": {
             "type": [
-              "null"
+              "null",
+              "string"
             ]
           },
           "pos": {
@@ -1052,12 +1072,14 @@
           },
           "creationMethod": {
             "type": [
-              "null"
+              "null",
+              "string"
             ]
           },
           "due": {
             "type": [
-              "null"
+              "null",
+              "string"
             ]
           }
         }
