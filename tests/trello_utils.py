@@ -37,9 +37,9 @@ REPLICATION_METHOD = {
     'users': 'FULL_TABLE'
 }
 TEST_USERS = {
-    'Test User 1': {'username': os.getenv('TRELLO_TEST_USER_1_EMAIL'), 'password': os.getenv('TRELLO_TEST_USER_1_PW')},
-    'Test User 2': {'username': os.getenv('TRELLO_TEST_USER_2_EMAIL'), 'password': os.getenv('TRELLO_TEST_USER_2_PW')},
-    'Test User 3': {'username': os.getenv('TRELLO_TEST_USER_3_EMAIL'), 'password': os.getenv('TRELLO_TEST_USER_3_PW')}
+    'Test User 1': {'username': os.getenv('TRELLO_TEST_USER_1_EMAIL'), 'password': os.getenv('TRELLO_TEST_USER_1_PW'), 'id': os.getenv('TRELLO_TEST_USER_1_ID')},
+    'Test User 2': {'username': os.getenv('TRELLO_TEST_USER_2_EMAIL'), 'password': os.getenv('TRELLO_TEST_USER_2_PW'), 'id': os.getenv('TRELLO_TEST_USER_2_ID')},
+    'Test User 3': {'username': os.getenv('TRELLO_TEST_USER_3_EMAIL'), 'password': os.getenv('TRELLO_TEST_USER_3_PW'), 'id': os.getenv('TRELLO_TEST_USER_3_ID')}
 }
 BASE_URL = "https://api.trello.com/1"
 HEADERS = {
@@ -117,7 +117,11 @@ def get_random_object_id(obj_type: str):
     """Return the id of a random object for a specified object_type"""
     global PARENT_OBJECTS  #, LIST_OBJECTS
 
-    if obj_type == get_parent_stream(obj_type): # if boards
+    if obj_type == 'users':
+        user_ids = [user.get('id') for user in TEST_USERS.values()]
+        return random.choice(user_ids)
+
+    elif obj_type == get_parent_stream(obj_type): # if boards
         if not PARENT_OBJECTS: # if we have not already done a get on baords
             PARENT_OBJECTS = get_objects(obj_type)
 
@@ -166,8 +170,10 @@ def get_url_string(req: str, obj_type: str, obj_id: str = "", parent_id: str = "
     # TODO may need to add a 'parent_obj' param if we don't want to use baords
 
     if obj_type == 'users':
-        url_string += "/boards/{}/members/{}".format(parent_id, obj_id)
-
+        if obj_id:
+            url_string += "/boards/{}/members/{}".format(parent_id, obj_id)
+        else:
+            url_string += "/boards/{}/members/all".format(parent_id)
     elif obj_type == 'actions':
         url_string += "/boards/{}/actions/{}".format(parent_id, obj_id)
 
@@ -294,19 +300,22 @@ def update_object(obj_type: str, obj_id: str = '', parent_id: str = '', field_to
     raise NotImplementedError
 
 def update_object_user(obj_id: str = '', parent_id: str = '', field_to_update: str = 'type'):
-    """Update a user by adding them to a board"""
+    """Update a user by adding them to a board, parent_id should be specified"""
     if not obj_id:
         obj_id = get_random_object_id('users')
-    
+
+    while not parent_id or parent_id == NEVER_DELETE_BOARD_ID:
+        parent_id = get_random_object_id('boards')
+
     data = stream_to_data_mapping('users')
     if data:
-        data_to_update = {field_to_update: "admin"} # add member to a board for users
+        data_to_update = {field_to_update: "normal"} # add member to a board for users
         endpoint = get_url_string('put', 'users', obj_id, parent_id)
         print(" * Test Data | Changing: {} ".format(data_to_update))
         resp = requests.put(url=endpoint, headers=HEADERS, params=PARAMS, json=data_to_update)
         if resp.status_code >= 400:
             logging.warn("Request Failed {} \n    {}".format(resp.status_code, resp.text))
-            data_to_update = {field_to_update: "normal"} # add member to a board for users
+            data_to_update = {field_to_update: "admin"} # add member to a board for users
             print(" * Test Data | Changing: {} ".format(data_to_update))
             resp = requests.put(url=endpoint, headers=HEADERS, params=PARAMS, json=data_to_update)
             if resp.status_code >= 400:
@@ -517,7 +526,7 @@ def reset_tracked_parent_objects():  # TODO Reset all tracked data if we end up 
 if __name__ == "__main__":
     test_creates = False
     test_updates = False
-    test_gets = True
+    test_gets = False
     test_deletes = False
 
     print_objects = True
@@ -565,3 +574,5 @@ if __name__ == "__main__":
                     print(deleted_obj)
                 continue
             print("FAILED")
+
+#print(get_objects('actions', parent_id=NEVER_DELETE_BOARD_ID))

@@ -74,7 +74,6 @@ class TestTrelloAutomaticFields(unittest.TestCase):
     def tap_name(self):
         return "tap-trello"
 
-
     def get_properties(self):
         return {
             'start_date' : dt.strftime(dt.utcnow(), self.START_DATE_FORMAT),  # set to utc today
