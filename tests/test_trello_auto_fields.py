@@ -2,6 +2,7 @@ import tap_tester.connections as connections
 import tap_tester.menagerie   as menagerie
 import tap_tester.runner      as runner
 import trello_utils as utils
+from singer import metadata
 
 import os
 import unittest
@@ -42,7 +43,9 @@ class TestTrelloAutomaticFields(unittest.TestCase):
 
     def testable_streams(self):
         return {
+            'actions',
             'boards',
+            'checklists',
             'cards',
             'lists',
             'users'
@@ -52,6 +55,7 @@ class TestTrelloAutomaticFields(unittest.TestCase):
             'actions',
             'boards',
             'cards',
+            'checklists',
             'lists',
             'users'
         }
@@ -64,12 +68,20 @@ class TestTrelloAutomaticFields(unittest.TestCase):
             'actions' : {"id"},
             'boards' : {"id"},
             'cards' : {'id'},
+            'checklists': {'id'},
             'lists' : {"id"},
             'users' : {"id", "boardId"}
         }
 
     def expected_automatic_fields(self):
-        return self.expected_pks()
+        return {
+            'actions' : {"id", "date"},
+            'boards' : {"id"},
+            'cards' : {'id'},
+            'checklists': {'id'},
+            'lists' : {"id"},
+            'users' : {"id", "boardId"}
+        }
 
     def tap_name(self):
         return "tap-trello"
@@ -78,6 +90,29 @@ class TestTrelloAutomaticFields(unittest.TestCase):
         return {
             'start_date' : dt.strftime(dt.utcnow(), self.START_DATE_FORMAT),  # set to utc today
         }
+
+    def select_all_streams_and_fields(self, conn_id, catalogs, select_all_fields: bool = True):
+        """Select all streams and all fields within streams"""
+        for catalog in catalogs:
+            schema = menagerie.get_annotated_schema(conn_id, catalog['stream_id'])
+
+            non_selected_properties = []
+            if not select_all_fields:
+                # get a list of all properties so that none are selected
+                non_selected_properties = schema.get('annotated-schema', {}).get(
+                    'properties', {})
+                for prop in self.expected_automatic_fields().get(catalog['stream_name'], []):
+                    if prop in non_selected_properties:
+                        del non_selected_properties[prop]
+            additional_md = []
+
+            if catalog['stream_name'] == 'actions':
+                additional_md = [{ "breadcrumb" : [], "metadata" : {'replication-method' : 'INCREMENTAL', 'replication-key': 'date'}}]
+            import pdb; pdb.set_trace()
+            connections.select_catalog_and_fields_via_metadata(
+                conn_id, catalog, schema, additional_md=additional_md,
+                non_selected_fields=non_selected_properties.keys()
+            )
 
     def test_run(self):
         """
@@ -128,27 +163,44 @@ class TestTrelloAutomaticFields(unittest.TestCase):
         self.assertGreater(len(found_catalogs), 0, msg="unable to locate schemas for connection {}".format(conn_id))
 
         found_catalog_names = set(map(lambda c: c['tap_stream_id'], found_catalogs))
-
         diff = self.expected_check_streams().symmetric_difference( found_catalog_names )
         self.assertEqual(len(diff), 0, msg="discovered schemas do not match: {}".format(diff))
         print("discovered schemas are OK")
 
-        #select all catalogs
+        # import pdb; pdb.set_trace()
+        # additional_md = [{"breadcrumb": [], "metadata": {'replication-method': 'INCREMENTAL',
+        #                                                  'replication-key': 'date'}}]
+        # connections.select_all_streams_and_fields(conn_id, found_catalogs, additional_md=additional_md)
+
+        # Select all streams but only automtic fields
+        self.select_all_streams_and_fields(conn_id, found_catalogs, select_all_fields=False)
+
+        ##########################################################################
+        ### WIP BELOW
+        ##########################################################################
+        #select certain... catalogs
+        our_catalogs = [c for c in found_catalogs if c.get('tap_stream_id') in self.expected_sync_streams()]
+
+        for cat in our_catalogs:
+            if cat['stream_name'] != 'actions':
+                continue
+            # replication_md = [{ "breadcrumb": ['properties', 'date'], "metadata": {'inclusion': 'automatic', 'replication-key': 'date', "replication-method" : "INCREMENTAL", "selected" : True}}]
+            replication_md = [{ "breadcrumb": [], "metadata": {'replication-key': 'date', "replication-method" : "INCREMENTAL"}}]
+            connections.set_non_discoverable_metadata(conn_id, cat, menagerie.get_annotated_schema(conn_id, cat['stream_id']), replication_md)
+
+        ##########################################################################
+        ### WIP ABOVE
+        ##########################################################################
         for cat in found_catalogs:
             catalog_entry = menagerie.get_annotated_schema(conn_id, cat['stream_id'])
-
             for k in self.expected_automatic_fields()[cat['stream_name']]:
                 mdata = next((m for m in catalog_entry['metadata']
                               if len(m['breadcrumb']) == 2 and m['breadcrumb'][1] == k), None)
                 print("Validating inclusion on {}: {}".format(cat['stream_name'], mdata))
                 self.assertTrue(mdata and mdata['metadata']['inclusion'] == 'automatic')
 
-            # need to filter selection so that we do not select anything outside of automatic fields
-            all_fields = set(catalog_entry.get('annotated-schema').get('properties').keys())            
-            non_selected_fields = all_fields.difference(self.expected_automatic_fields()[cat['stream_name']])
-
-            connections.select_catalog_and_fields_via_metadata(conn_id, cat, catalog_entry,
-                                                               non_selected_fields=non_selected_fields)
+        import pdb; pdb.set_trace()
+        catalogs = menagerie.get_catalogs(conn_id)
 
         #clear state
         menagerie.set_state(conn_id, {})

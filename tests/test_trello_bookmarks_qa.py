@@ -49,6 +49,7 @@ class TrelloBookmarksQA(unittest.TestCase):
             'actions',
             'boards',
             'cards',
+            'checklists',
             'lists',
             'users'
         }
@@ -60,6 +61,7 @@ class TrelloBookmarksQA(unittest.TestCase):
         return {
             'boards',
             'cards',
+            'checklists',
             'lists',
             'users',
         }
@@ -78,7 +80,8 @@ class TrelloBookmarksQA(unittest.TestCase):
             'users' : {'id', "boardId"},
             'lists' : {'id'},
             'actions' : {'id'},
-            'cards' : {'id'}
+            'cards' : {'id'},
+            'checklists' : {'id'}
         }
 
     def expected_automatic_fields(self):

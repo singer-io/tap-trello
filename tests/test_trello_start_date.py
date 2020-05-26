@@ -48,6 +48,7 @@ class TestTrelloStartDate(unittest.TestCase):
             'actions',
             'boards',
             'cards',
+            'checklists',
             'lists',
             'users'
         }
@@ -56,6 +57,7 @@ class TestTrelloStartDate(unittest.TestCase):
             'actions',
             'boards',
             'cards',
+            'checklists',
             'lists',
             'users'
         }
@@ -68,6 +70,7 @@ class TestTrelloStartDate(unittest.TestCase):
             "actions" : {"id"},
             "boards" : {"id"},
             'cards' : {'id'},
+            'checklists' : {'id'},
             "lists" : {"id"},
             "users" : {"id", "boardId"}
         }

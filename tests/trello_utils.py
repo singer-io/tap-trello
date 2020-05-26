@@ -19,6 +19,7 @@ PARENT_STREAM = {
     'boards': 'boards',
     'lists': 'boards',
     'cards': 'boards',
+    'checklists': 'boards',
     'users': 'boards'
 }
 MAX_API_LIMIT = 1000 # this is the smallest
@@ -33,6 +34,7 @@ REPLICATION_METHOD = {
     'actions': 'INCREMENTAL',
     'boards': 'FULL_TABLE',
     'cards': 'FULL_TABLE',
+    'checklists': 'FULL_TABLE',
     'lists': 'FULL_TABLE',
     'users': 'FULL_TABLE'
 }
@@ -121,6 +123,13 @@ def get_random_object_id(obj_type: str):
         user_ids = [user.get('id') for user in TEST_USERS.values()]
         return random.choice(user_ids)
 
+    elif obj_type == 'cards':
+        objects = ""
+        while not objects: # Protect against boards without cards
+            objects = get_objects(obj_type)
+        random_object = objects[random.randint(0, len(objects) -1)]
+        return random_object.get('id')
+
     elif obj_type == get_parent_stream(obj_type): # if boards
         if not PARENT_OBJECTS: # if we have not already done a get on baords
             PARENT_OBJECTS = get_objects(obj_type)
@@ -185,6 +194,12 @@ def get_url_string(req: str, obj_type: str, obj_id: str = "", parent_id: str = "
                 url_string += "/boards/{}/cards/all".format(parent_id)
         else:
             url_string += "/cards/{}".format(obj_id)
+
+    elif obj_type == 'checklists':
+        if req == 'get':
+            url_string += "/boards/{}/checklists/{}".format(parent_id, obj_id)
+        else:
+            url_string += "/checklists"
 
     elif obj_type == 'lists':
         if req == 'get' or 'delete':
@@ -259,12 +274,17 @@ def get_test_data():
             "coordinates": "", # For use with/by the Map Power-Up. Should take the form latitude,longitude
             "keepFromSource": "string", # If using idCardSource you can specify which properties to copy over.
         },
+        "CHECKLISTS": {
+            "name": "Checklist {}".format(tstamp),
+            "idCard": "{}".format(get_random_object_id('cards')),
+            "pos": "{}".format(random.choice(["top", "bottom", random.randint(1,20)])),  # [top,bottom,positive float]
+            "idChecklistSource": "",
+        },
         "LISTS" : {
             "name":"List {}".format(tstamp),
             "idBoard": "{}".format(get_random_object_id('boards')),  # The long ID of the board the list should be created on
             "idListSource":"",  # ID of the List to copy into the new List
             "pos": "{}".format(random.choice(["top", "bottom", random.randint(1,20)])),  # card pos [top,bottom,positive float]
-
         }
     }
 
@@ -333,6 +353,7 @@ def stream_to_data_mapping(stream):
     mapping = {
         'actions': "BOARDS", # random.choice(data) TODO
         "boards": "BOARDS",
+        "checklists": "CHECKLISTS",
         "cards": "CARDS",
         "lists": "LISTS",
         "users": "USERS",
@@ -531,7 +552,7 @@ if __name__ == "__main__":
 
     print_objects = True
 
-    objects_to_test = ['users'] # ['actions', 'boards', 'cards', 'lists', 'users']
+    objects_to_test = ['checklists'] # ['actions', 'boards', 'cards', 'lists', 'users']
 
     print("********** Testing basic functions of utils **********")
     if test_creates:
@@ -574,5 +595,3 @@ if __name__ == "__main__":
                     print(deleted_obj)
                 continue
             print("FAILED")
-
-#print(get_objects('actions', parent_id=NEVER_DELETE_BOARD_ID))
