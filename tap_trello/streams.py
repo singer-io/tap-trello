@@ -190,10 +190,17 @@ class Stream:
     def modify_record(self, record, **kwargs): # pylint: disable=no-self-use,unused-argument
         return record
 
+    def build_custom_fields_map(self):
+        return {}
+
     def get_records(self, format_values, additional_params=None):
+        import ipdb; ipdb.set_trace()
+        1+1
         if additional_params is None:
             additional_params = {}
 
+        custom_fields_id_to_name = self.build_custom_fields_map()
+            
         # Boards, Users, and Lists don't handle an api limit key
         # Passing in None doesn't change the response (no 400 returned)
         records = self.client.get(
@@ -212,12 +219,30 @@ class Stream:
             )
 
         for rec in records:
-            yield self.modify_record(rec, parent_id_list = format_values)
+            yield self.modify_record(rec, parent_id_list = format_values, custom_fields_map = custom_fields_id_to_name)
 
 
     def sync(self):
         for rec in self.get_records(self.get_format_values()):
             yield rec
+
+class AddCustomFields(Mixin):
+    def build_custom_fields_map(self, **kwargs):
+        fields_map = {}
+        boardIdList = kwargs['parent_id_list']
+        assert len(boardIdList) == 1
+        customFields = self.client.get('https://api.trello.com/1/boards/{}/customFields', boardIdList[0])
+        for custom_field in custom_fields:
+            fields_map[custom_field['id']] = custom_field['name']
+        
+
+    def modify_record(self, record, **kwargs):
+        custom_fields_map = kwargs['custom_fields_map']
+        for custom_field in record['customFieldItems']:
+            custom_field['name'] = custom_fields_map[custom_field['idCustomField']]
+        return record
+
+    
 
 class AddBoardId(Mixin):
     def modify_record(self, record, **kwargs): # pylint: disable=no-self-use
@@ -329,7 +354,7 @@ class Cards(ChildStream):
     replication_method = "FULL_TABLE"
     parent_class = Boards
     MAX_API_RESPONSE_SIZE = 20000
-    params = {'limit': 20000}
+    params = {'limit': 20000, 'customFieldItems': 'true'}
 
 class Checklists(ChildStream):
     stream_id = "checklists"
