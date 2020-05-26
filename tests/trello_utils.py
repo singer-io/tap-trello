@@ -123,9 +123,9 @@ def get_random_object_id(obj_type: str):
         user_ids = [user.get('id') for user in TEST_USERS.values()]
         return random.choice(user_ids)
 
-    elif obj_type == 'cards':
+    elif obj_type in ['cards', 'lists']:
         objects = ""
-        while not objects: # Protect against boards without cards
+        while not objects: # Protect against boards without cards or lists
             objects = get_objects(obj_type)
         random_object = objects[random.randint(0, len(objects) -1)]
         return random_object.get('id')
@@ -255,7 +255,24 @@ def get_test_data():
     tstamp = dt.utcnow().timestamp() # this is used to genereate unique data
 
     TEST_DATA = {
-        "BOARDS": {"name": "Board {}".format(tstamp)},
+        "BOARDS": {
+            "name": "Board {}".format(tstamp),
+            "defaultLabels": False,
+            "defaultLists": False,
+            "desc": "desciptive description",
+            "idOrganization": "",
+            "idBoardSource": "",  # The id of a board to copy into the new board.
+            "keepFromSource": "",  # To keep cards from the original board pass in the value cards (Valid values: cards, none)
+            "powerUps": "",  # One of: all, calendar, cardAging, recap, voting.
+            "prefs_permissionLevel": "private",  # One of: org, private, public.
+            "prefs_voting": "disabled",  # Who can vote on this board. One of disabled, members, observers, org, public.
+            "prefs_comments": "members",  # Who can comment on cards on board. Oneof: disabled, members, observers, org, public.
+            "prefs_invitations": "members",  # Determines what types of members can invite users to join. One of: admins, members.
+            "prefs_selfJoin": True,  # whether users can join the boards or have to be invited. Default: true
+            "prefs_cardCovers": True,  # Determines whether card covers are enabled.
+            "prefs_background": "blue",  # id of  background or oneof: blue, orange, green, red, purple, pink, lime, sky, grey
+            "prefs_cardAging": "regular", # type of card aging on the board (if enabled) One of: pirate, regular. Default: regular
+        },
         "USERS": {"type": ""},  # {"fullName":"xae a12","username":"singersongwriterd42"}
         "CARDS": {
             "name":"Card {}".format(tstamp),
@@ -552,7 +569,7 @@ if __name__ == "__main__":
 
     print_objects = True
 
-    objects_to_test = ['checklists'] # ['actions', 'boards', 'cards', 'lists', 'users']
+    objects_to_test = ['boards'] # ['actions', 'boards', 'cards', 'lists', 'users', 'checklists']
 
     print("********** Testing basic functions of utils **********")
     if test_creates:

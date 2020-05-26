@@ -204,7 +204,6 @@ class TrelloBookmarksQA(unittest.TestCase):
         # TESTING FULL TABLE STREAMS
         for stream in self.expected_full_table_sync_streams().difference(self.untestable_streams()):
             with self.subTest(stream=stream):
-                # TODO BUG writeup lists failure
                 record_count_1 = record_count_by_stream_1.get(stream, 0)
                 record_count_2 = record_count_by_stream_2.get(stream, 0)
 
@@ -215,8 +214,6 @@ class TrelloBookmarksQA(unittest.TestCase):
                 # Assert that we are capturing the expected number of records for full table streams
                 self.assertGreater(record_count_2, record_count_1,
                                    msg="Full table streams should have more data in second sync.")
-                if stream == 'lists':
-                    continue  # TODO Investigate failure with lists, 4 != 1
                 self.assertEqual((record_count_2 - record_count_1),
                                  len(expected_records_2.get(stream, [])),
                                  msg="The differnce in record counts between syncs should " +\
