@@ -319,13 +319,13 @@ class TrelloBookmarkStates(unittest.TestCase):
             )
 
             # Verify the difference in sync matches the number of records on all other boards
-            record_count_all_boards, _ = utils.get_total_record_count_and_objects(child_stream=stream, since=self.START_DATE)
-            record_count_state_board = len(utils.get_objects(stream, parent_id=utils.NEVER_DELETE_BOARD_ID, since=self.START_DATE))
-            record_count_other_boards = record_count_all_boards - record_count_state_board
-            self.assertGreaterEqual(record_count_by_stream.get(stream, 0) - record_count_by_stream_0.get(stream, 0), # TODO should these be equal?
-                                    record_count_other_boards,
-                                    msg="Expected to have exactly {} records difference for {}".format(record_count_other_boards, stream)
-            )
+            # record_count_all_boards, _ = utils.get_total_record_count_and_objects(child_stream=stream, since=self.START_DATE)
+            # record_count_state_board = len(utils.get_objects(stream, parent_id=utils.NEVER_DELETE_BOARD_ID, since=self.START_DATE))
+            # record_count_other_boards = record_count_all_boards - record_count_state_board
+            # self.assertGreaterEqual(record_count_by_stream.get(stream, 0) - record_count_by_stream_0.get(stream, 0), # TODO should these be equal?
+            #                         record_count_other_boards,
+            #                         msg="Expected to have exactly {} records difference for {}".format(record_count_other_boards, stream)
+            # )
 
             # # Verify the new object is not caught by the recent sync. Even though
             # data_0 = synced_records_0.get(stream, [])

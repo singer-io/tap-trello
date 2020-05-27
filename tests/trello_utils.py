@@ -603,7 +603,7 @@ if __name__ == "__main__":
 
     print_objects = True
 
-    objects_to_test = ['boards'] # ['actions', 'boards', 'cards', 'lists', 'users', 'checklists']
+    objects_to_test = ['actions'] # ['actions', 'boards', 'cards', 'lists', 'users', 'checklists']
 
     print("********** Testing basic functions of utils **********")
     if test_creates:

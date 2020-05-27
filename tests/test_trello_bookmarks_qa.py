@@ -182,7 +182,7 @@ class TrelloBookmarksQA(unittest.TestCase):
         updated_records = {x: [] for x in self.expected_sync_streams()}
         for stream in self.expected_sync_streams().difference(self.untestable_streams()):
             for _ in range(1):
-                updated_object = utils.updated_object(stream)
+                updated_object = utils.update_object(stream)
                 updated_records[stream].append({field: updated_object.get(field)
                                                 for field in self.expected_automatic_fields().get(stream)})
 
