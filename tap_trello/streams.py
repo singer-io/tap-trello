@@ -90,10 +90,13 @@ class DateWindowPaginated(Mixin):
         sub_window_end = singer.get_bookmark(self.state, self.stream_id, 'sub_window_end')
         window_end = singer.get_bookmark(self.state, self.stream_id, 'window_end')
 
+        # adjusting window to lookback 1 day
+        adjusted_window_start = utils.strftime(utils.strptime_to_utc(window_start)-timedelta(days=1))
+
         start_date = self.config.get('start_date')
         end_date = self.config.get('end_date', window_end)
 
-        window_start = utils.strptime_to_utc(max(window_start, start_date))
+        window_start = utils.strptime_to_utc(max(adjusted_window_start, start_date))
         sub_window_end = sub_window_end and  utils.strptime_to_utc(min(sub_window_end, end_date))
         window_end = utils.strptime_to_utc(min(window_end, end_date))
 
