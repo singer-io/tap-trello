@@ -60,19 +60,20 @@
               "checked": {
                 "type": [
                   "null",
-                  "string"
+                  "boolean"
                 ]
               },
               "date": {
                 "type": [
                   "null",
                   "string"
-                ]
+                ],
+                "format": "date-time"
               },
               "number": {
                 "type": [
                   "null",
-                  "string"
+                  "number"
                 ]
               },
               "text": {

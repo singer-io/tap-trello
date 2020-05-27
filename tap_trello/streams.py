@@ -228,6 +228,9 @@ class Stream:
             yield rec
 
 class AddCustomFields(Mixin):
+    def _get_dropdown_option_key(self, field_id, option_id): # pylint: disable=no-self-use
+        return field_id + '_' + option_id
+
     def build_custom_fields_maps(self, **kwargs):
         custom_fields_map = {}
         dropdown_options_map = {}
@@ -240,7 +243,8 @@ class AddCustomFields(Mixin):
             custom_fields_map[custom_field['id']] = custom_field['name']
             if custom_field['type'] == 'list':
                 for dropdown_option in custom_field['options']:
-                    dropdown_options_map[dropdown_option['idCustomField'] + '_' + dropdown_option['id']] = dropdown_option['value']['text']
+                    dropdown_option_key = self._get_dropdown_option_key(dropdown_option['idCustomField'], dropdown_option['id'])
+                    dropdown_options_map[dropdown_option_key] = dropdown_option['value']['text']
 
         return custom_fields_map, dropdown_options_map
 
@@ -251,7 +255,8 @@ class AddCustomFields(Mixin):
         for custom_field in record['customFieldItems']:
             custom_field['name'] = custom_fields_map[custom_field['idCustomField']]
             if custom_field.get('idValue', None):
-                custom_field['value'] = {'option': dropdown_options_map[custom_field['idCustomField'] + '_' + custom_field['idValue']]}
+                dropdown_option_key = self._get_dropdown_option_key(custom_field['idCustomField'], custom_field['idValue'])
+                custom_field['value'] = {'option': dropdown_options_map[dropdown_option_key]}
 
         return record
 
