@@ -427,12 +427,12 @@ class TrelloBookmarkStates(unittest.TestCase):
             # Verify bookmarks were saved as expected inc streams
             self.assertTrue(state_3.get('bookmarks', {}).get(stream, {}).get('window_start', {}))
             print("Bookmarks meet expectations")
-
+            # TODO this is no longer valid due to lookback window
             # Verify no data was replicated for incremental streams
-            self.assertEqual(
-                record_count_by_stream_3.get(stream, 0), 0,
-                msg="Expected not to replicate inc streams for state:\n{}".format(states_to_test[3])
-            )
+            # self.assertEqual(
+            #     record_count_by_stream_3.get(stream, 0), 0,
+            #     msg="Expected not to replicate inc streams for state:\n{}".format(states_to_test[3])
+            # )
 
         ##########################################################################
         ### CLEAN UP

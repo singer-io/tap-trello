@@ -330,6 +330,9 @@ def update_object(obj_type: str, obj_id: str = '', parent_id: str = '', field_to
     elif obj_type == "boards":
         return update_object_board(obj_id, field_to_update)
 
+    elif obj_type == "actions":
+        return update_object_board(obj_id)
+
     data = stream_to_data_mapping(obj_type)
     if data:
         if data.get(field_to_update):
@@ -345,6 +348,19 @@ def update_object(obj_type: str, obj_id: str = '', parent_id: str = '', field_to
         return resp.json()
 
     raise NotImplementedError
+
+def update_object_action(obj_id: str = '', field_to_update: str = 'name'):
+    """update comment actions"""
+    if not obj_id:
+        raise Exception("You must specify a comment object action")
+    endpoint = BASE_URL + "/actions/{}/text"
+    data = {"value": get_comment_action(update=True)}
+    resp = requests.put(url=endpoint, headers=HEADERS, params=PARAMS, json=data)
+    if resp.status_code >= 400:
+        logging.warn("Request Failed {} \n    {}".format(resp.status_code, resp.text))
+        return None
+
+    return resp.json()
 
 def update_object_board(obj_id: str = '', field_to_update: str = 'name'):
     """Update a user by adding them to a board, parent_id should be specified"""
@@ -417,9 +433,20 @@ def get_action_fields_by_stream():
     """
     return {
         'boards': ['name'],
+        'cards': ['text'],
     }
 
-def create_object_actions(recipient_stream: str = "boards", obj_id: str = ""):
+def get_action_comment(update: bool = False):
+    global tstamp
+    tstamp = dt.utcnow().timestamp()
+
+    comment_type = ""
+    if update:
+        comment_type = "UPDATE "
+    comment = "{}Here is a comment for ya at approx: {}".format(comment_type, tstamp)
+    return comment
+
+def create_object_actions(recipient_stream: str = "boards", obj_id: str = "", action_type = None):
     """
     method for generating specifc actions
     : param obj_id: id of parent stream object
@@ -428,22 +455,51 @@ def create_object_actions(recipient_stream: str = "boards", obj_id: str = ""):
     return the new actions object that was just completed
     """
     if not obj_id:
-        attempts = 0
-        while not obj_id or (obj_id == NEVER_DELETE_BOARD_ID) and attempts < 50:
+        if recipient_stream in ["cards"]:
             obj_id = get_random_object_id(recipient_stream)
-            attempts += 1
 
-    if obj_id == NEVER_DELETE_BOARD_ID:
-        logging.warn("Request Ignored |  You tried to change a board that other tests rely on |  " +\
-                     "Board (id={}) should not be altered".format(NEVER_DELETE_BOARD_ID))
-        raise Exception("We do not have enough boards. We are being forced to update board named 'NEVER DELETE'")
+        elif recipient_stream == "boards":
+            attempts = 0
+            while not obj_id or (obj_id == NEVER_DELETE_BOARD_ID) and attempts < 50:
+                obj_id = get_random_object_id(recipient_stream)
+                attempts += 1
+                
+            if obj_id == NEVER_DELETE_BOARD_ID:
+                logging.warn("Request Ignored |  You tried to change a board that other tests rely on |  " +\
+                             "Board (id={}) should not be altered".format(NEVER_DELETE_BOARD_ID))
+                raise Exception("We do not have enough boards. We are being forced to update board named 'NEVER DELETE'")
+
+        else:
+          raise NotImplementedError
 
     pot_fields_to_update = get_action_fields_by_stream().get(recipient_stream)
     field_to_update = pot_fields_to_update[random.randint(0, len(pot_fields_to_update) - 1)]
     
     data = stream_to_data_mapping(recipient_stream)
     if data:
-        if data.get(field_to_update):
+        if action_type == "comment":
+            data_to_update = {field_to_update: get_action_comment()}
+
+            endpoint = BASE_URL + "/{}/{}/actions/comments".format(recipient_stream, obj_id)
+            print(" * Test Data | Changing: {} ".format(data_to_update))
+            resp = requests.post(url=endpoint, headers=HEADERS, params=PARAMS, json=data_to_update)
+            if resp.status_code >= 400:
+                logging.warn("Request Failed {} \n    {}".format(resp.status_code, resp.text))
+
+                return None
+
+            recipient_object_id = resp.json().get('id')
+            endpoint = BASE_URL + "/{}/{}/board".format(recipient_stream, obj_id)
+            resp = requests.get(url=endpoint, headers=HEADERS, params=PARAMS)
+
+            if resp.status_code >= 400:
+                logging.warn("Request Failed {} \n    {}".format(resp.status_code, resp.text))
+                return None
+
+            parent_id = resp.json().get('id')
+            actions_objects = get_objects(obj_type='actions', parent_id=parent_id)
+
+        elif not action_type and data.get(field_to_update):
             data_to_update = {field_to_update: data.get(field_to_update)} # just change the name for baords (actions)
 
             endpoint = get_url_string("put", recipient_stream, obj_id)
@@ -451,11 +507,16 @@ def create_object_actions(recipient_stream: str = "boards", obj_id: str = ""):
             resp = requests.put(url=endpoint, headers=HEADERS, params=PARAMS, json=data_to_update)
             if resp.status_code >= 400:
                 logging.warn("Request Failed {} \n    {}".format(resp.status_code, resp.text))
+
                 return None
+
             recipient_object_id = resp.json().get('id')
             actions_objects = get_objects(obj_type='actions', parent_id=recipient_object_id)
 
-            return actions_objects[0]
+        else:
+            raise NotImplementedError
+
+        return actions_objects[0]
 
     raise NotImplementedError
     
@@ -515,7 +576,7 @@ def create_object_cards(obj_type: str='cards', parent_id=''):
 
     raise NotImplementedError
 
-def create_object(obj_type, obj_id: str = "", parent_id: str = ""):
+def create_object(obj_type, obj_id: str = "", parent_id: str = "", action_type = None):
     """
     Create a single record for a given object
 
@@ -528,7 +589,10 @@ def create_object(obj_type, obj_id: str = "", parent_id: str = ""):
     if obj_type == 'actions':
         print(" * Test Data | DIRECT CREATES ARE UNAVAILABLE for {}. ".format(obj_type) +\
               "UPDATING another stream to generate new record")
-        return create_object_actions('boards', obj_id=parent_id)
+        if action_type:
+            return create_object_actions('cards', obj_id=parent_id, action_type=action_type)
+
+        return create_object_actions('boards', obj_id=parent_id, action_type=action_type)
 
     elif obj_type == 'boards':
         return create_object_boards()

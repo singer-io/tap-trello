@@ -1,6 +1,7 @@
 import os
 import logging
 import unittest
+import random
 from datetime import datetime as dt
 from datetime import timedelta
 from functools import reduce
@@ -113,6 +114,10 @@ class TrelloBookmarksQA(unittest.TestCase):
             logging.info("Data generated for stream: {}".format(stream))
             expected_records_1[stream].append({field: new_object.get(field)
                                                for field in self.expected_automatic_fields().get(stream)})
+        # Create comment actions
+        action_comments = []
+        action_comments.append(utils.create_object('actions', action_type="comment"))
+        action_comments.append(utils.create_object('actions', action_type="comment"))
 
         # run in check mode
         conn_id = connections.ensure_connection(self)
@@ -160,7 +165,7 @@ class TrelloBookmarksQA(unittest.TestCase):
         self.assertGreater(replicated_row_count_1, 0, msg="failed to replicate any data: {}".format(record_count_by_stream_1))
         print("total replicated row count: {}".format(replicated_row_count_1))
 
-        # Verify that automatic fields are all emitted with records
+        # get emitted with records
         synced_records_1 = runner.get_records_from_target_output()
 
         # Verify bookmarks were saved for all streams
@@ -178,13 +183,12 @@ class TrelloBookmarksQA(unittest.TestCase):
                 expected_records_2[stream].append({field: new_object.get(field)
                                                    for field in self.expected_automatic_fields().get(stream)})
 
-        print("Generating more data prior to 2nd sync")
-        # updated_records = {x: [] for x in self.expected_sync_streams()}
-        # for stream in self.expected_sync_streams().difference(self.untestable_streams()):
-        #     for _ in range(1):
-        #         updated_object = utils.update_object(stream)
-        #         updated_records[stream].append({field: updated_object.get(field)
-        #                                         for field in self.expected_automatic_fields().get(stream)})
+        print("Updating existing data prior to 2nd sync")
+        # Update a single comment action before second sync
+        updated_records = {x: [] for x in self.expected_sync_streams()}
+        obj_id_to_update = random.choice(action_comments).get('id')
+        updated_object = utils.update_object(stream, obj_id=obj_id_to_update)
+        updated_records[stream].append(updated_object)
 
         # Run another sync
         print("Running 2nd sync job")
@@ -202,6 +206,9 @@ class TrelloBookmarksQA(unittest.TestCase):
         self.assertGreater(replicated_row_count_2, 0,
                            msg="failed to replicate any data: {}".format(record_count_by_stream_2))
         print("total replicated row count: {}".format(replicated_row_count_2))
+
+        # get emitted with records
+        synced_records_2 = runner.get_records_from_target_output()
 
         # Verify bookmarks were saved as expected inc streams
         state_2 = menagerie.get_state(conn_id)
@@ -228,7 +235,20 @@ class TrelloBookmarksQA(unittest.TestCase):
                                  "equal the number of records we created between syncs.\n" +\
                                  "This is not the case for {}".format(stream))
 
-                # TODO Assert that we are capturing the expected records for full table streams
+                # Assert that we are capturing the expected records for full table streams
+                data_1 = synced_records_1.get(stream, [])
+                record_messages_1 = [row.get('data').get('id') for row in data_1['messages']]
+                data_2 = synced_records_2.get(stream, [])
+                record_messages_2 = [row.get('data').get('id') for row in data_2['messages']]
+                for record in expected_records_1.get(stream):
+                    self.assertTrue(record.get('id') in record_messages_1,
+                                    msg="Missing an expected record from sync 1.")
+                    self.assertTrue(record.get('id') in record_messages_2,
+                                    msg="Missing an expected record from sync 2.")
+                expected_records_2_set = set(record.get('id') for record in expected_records_2.get(stream))
+                self.assertEqual(set(record_messages_2).difference(set(record_messages_1)),
+                                 expected_records_2_set,
+                                 msg="We did not get the new record(s)")
 
                 # TODO assertions for updated data for each stream
 
@@ -260,7 +280,25 @@ class TrelloBookmarksQA(unittest.TestCase):
                 self.assertEqual(record_count_2, len(expected_records_2.get(stream, [])),
                                  msg="Stream {} replicated an unexpedted number records on 2nd sync.".format(stream))
 
-                # TODO Assert that we are capturing the expected records for inc streams
+                # Assert that we are capturing the expected records for inc streams
+                data_1 = synced_records_1.get(stream, [])
+                record_messages_1 = [row.get('data').get('id') for row in data_1['messages']]
+                data_2 = synced_records_2.get(stream, [])
+                record_messages_2 = [row.get('data').get('id') for row in data_2['messages']]
+                for record in expected_records_1.get(stream):
+                    self.assertTrue(record.get('id') in record_messages_1,
+                                    msg="Missing an expected record from sync 1.")
+                    self.assertFalse(record.get('id') in record_messages_2,
+                                     msg="This record does not belong in this sync:" +\
+                                     "{}".format(record.get('id')))
+
+                for record in expected_records_2.get(stream):
+                    self.assertTrue(record.get('id') in record_messages_2,
+                                    msg="Missing an expected record from sync 1.")
+                    self.assertFalse(record.get('id') in record_messages_1,
+                                     msg="This record does not belong in this sync:" +\
+                                     "{}".format(record.get('id')))
+
         print("Incremental streams tested.")
 
         # CLEANING UP
