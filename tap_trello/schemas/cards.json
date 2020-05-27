@@ -97,7 +97,8 @@
         "null",
         "array"
       ],
-      "items": null
+      "items": {
+      }
     },
     "closed": {
       "type": [
