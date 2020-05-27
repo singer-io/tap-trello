@@ -178,6 +178,14 @@ class TrelloBookmarksQA(unittest.TestCase):
                 expected_records_2[stream].append({field: new_object.get(field)
                                                    for field in self.expected_automatic_fields().get(stream)})
 
+        print("Generating more data prior to 2nd sync")
+        updated_records = {x: [] for x in self.expected_sync_streams()}
+        for stream in self.expected_sync_streams().difference(self.untestable_streams()):
+            for _ in range(1):
+                updated_object = utils.updated_object(stream)
+                updated_records[stream].append({field: updated_object.get(field)
+                                                for field in self.expected_automatic_fields().get(stream)})
+
         # Run another sync
         print("Running 2nd sync job")
         sync_job_name_2 = runner.run_sync_mode(self, conn_id)
@@ -221,6 +229,8 @@ class TrelloBookmarksQA(unittest.TestCase):
                                  "This is not the case for {}".format(stream))
 
                 # TODO Assert that we are capturing the expected records for full table streams
+
+                # TODO assertions for updated data for each stream
 
         print("Full table streams tested.")
 

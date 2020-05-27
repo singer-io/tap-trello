@@ -15,7 +15,7 @@ class TrelloBookmarkStates(unittest.TestCase):
     START_DATE = ""
     START_DATE_FORMAT = "%Y-%m-%dT00:00:00Z"
     TEST_TIME_FORMAT = "%Y-%m-%dT%H:%M:%S.%fZ"
-    ACTIONS_STATES = {  # TODO determine if these should always run TODO see if menagerie accepts these
+    ACTIONS_STATES = {
         "state_0": {  # State of interrupted sync for Inc streams
             "parent_id": utils.NEVER_DELETE_BOARD_ID,
             "window_start": 0, "sub_window_end": 0, "window_end": 0
@@ -25,17 +25,17 @@ class TrelloBookmarkStates(unittest.TestCase):
         },
         "state_2": {  # Final state after standard sync
             "window_start": 0,
-        },  # ERROR STATES BELOW
+        },
         "state_3": {  # Set window_start = window_end
             "parent_id": utils.NEVER_DELETE_BOARD_ID,
             "window_start": 0, "window_end": 0
-        },        
-        "state_4": {  # Valid bookmark states but missing a parent_id
-            "window_start": 0, "sub_window_end": 0, "window_end": 0
-        },
-        "state_5": {  # Set all bookmarks to None to exploit a potential oversight in 'on_window_started()'
-            "parent_id": utils.NEVER_DELETE_BOARD_ID
-        },
+        },  # ERROR STATES BELOW
+        # "state_4": {  # Valid bookmark states but missing a parent_id
+        #     "window_start": 0, "sub_window_end": 0, "window_end": 0
+        # },
+        # "state_5": {  # Set all bookmarks to None to exploit a potential oversight in 'on_window_started()'
+        #     "parent_id": utils.NEVER_DELETE_BOARD_ID
+        # },
     }
 
     def setUp(self):
@@ -72,6 +72,7 @@ class TrelloBookmarkStates(unittest.TestCase):
             'actions',
             'boards',
             'cards',
+            'checklists',
             'lists',
             'users'
         }
@@ -83,6 +84,7 @@ class TrelloBookmarkStates(unittest.TestCase):
         return {
             'boards',
             'cards',
+            'checklists',
             'lists',
             'users',
         }
@@ -101,7 +103,8 @@ class TrelloBookmarkStates(unittest.TestCase):
             'users' : {'id', 'boardId'},
             'lists' : {'id'},
             'actions' : {'id'},
-            'cards' : {'id'}
+            'cards' : {'id'},
+            'checklists':  {'id'}
         }
 
     def expected_automatic_fields(self):
@@ -125,6 +128,7 @@ class TrelloBookmarkStates(unittest.TestCase):
         self.START_DATE = self.get_properties().get('start_date')
 
         # ensure data exists for sync streams and set expectations
+        records_to_create = 3
         expected_records = {x: [] for x in self.expected_sync_streams()} # ids by stream
         for stream in self.expected_sync_streams().difference(self.untestable_streams()):
             _, existing_objects = utils.get_total_record_count_and_objects(stream)
@@ -135,16 +139,14 @@ class TrelloBookmarkStates(unittest.TestCase):
                         {field: obj.get(field)
                          for field in self.expected_automatic_fields().get(stream)}
                     )
-                continue
-            # Create 1 record if none exist
-            logging.info("Data does not exist for stream: {}".format(stream))
-            new_object = utils.create_object(stream)
-            logging.info("Data generated for stream: {}".format(stream))
-            expected_records[stream].append({field: obj.get(field)
-                                            for field in self.expected_automatic_fields().get(stream)})
-
-        # set time for comparing recent records once bookmark state is changed
-        test_start_time = dt.utcnow().strftime(self.TEST_TIME_FORMAT)  # "date": "2020-05-15T11:41:37.432Z"
+            else:
+                logging.info("Data does not exist for stream: {}".format(stream))
+            while len(expected_records.get(stream)) < records_to_create:
+                # Create more records if necessary
+                new_object = utils.create_object(stream)
+                logging.info("Data generated for stream: {}".format(stream))
+                expected_records[stream].append({field: new_object.get(field)
+                                                 for field in self.expected_automatic_fields().get(stream)})
 
         # run in check mode
         conn_id = connections.ensure_connection(self)
@@ -262,12 +264,15 @@ class TrelloBookmarkStates(unittest.TestCase):
         ### Testing interrupted sync state_0 with date-windowing
         ##########################################################################
         # Generate a new actions object for setting expectations
-        # new_actions = [utils.create_object('actions')]
+        # new_objects = {x: [] for x in self.expected_incremental_sync_streams()}
+        # for stream in self.expected_incremental_sync_streams():
+        #     new_objects[stream].append(utils.create_object(stream).get('id'))
 
         version_0 = menagerie.get_state_version(conn_id)
 
         # Set window_end based off current time
-        window_end_0 = dt.utcnow().strftime(self.TEST_TIME_FORMAT)
+        # window_end_0 = dt.utcnow().strftime(self.TEST_TIME_FORMAT)
+        window_end_0 = state['bookmarks']['actions']['window_start']
         states_to_test[0]['bookmarks']['actions']['window_end'] = window_end_0
 
         # Set sub_window_end to today
@@ -307,15 +312,27 @@ class TrelloBookmarkStates(unittest.TestCase):
             self.assertTrue(state_0.get('bookmarks', {}).get(stream, {}).get('window_start', {}))
             print("Bookmarks for {} meet expectations".format(stream))
 
-            # Verify the newly created boards are caught in this sync
-            self.assertGreater(record_count_by_stream_0.get(stream, 0),
-                               record_count_by_stream.get(stream, 0),
+            # Verify the original sync catches more data since current state bookmarks on the oldest board
+            self.assertGreater(record_count_by_stream.get(stream, 0),
+                               record_count_by_stream_0.get(stream, 0),
                                msg="Expected to have more records for {}".format(stream)
             )
-            self.assertEqual(record_count_by_stream_0.get(stream, 0) - record_count_by_stream.get(stream, 0),
-                             len(new_boards),
-                             msg="Expected to have exactly {} more record for {}".format(len(new_boards), stream)
+
+            # Verify the difference in sync matches the number of records on all other boards
+            record_count_all_boards, _ = utils.get_total_record_count_and_objects(child_stream=stream, since=self.START_DATE)
+            record_count_state_board = len(utils.get_objects(stream, parent_id=utils.NEVER_DELETE_BOARD_ID, since=self.START_DATE))
+            record_count_other_boards = record_count_all_boards - record_count_state_board
+            self.assertGreaterEqual(record_count_by_stream.get(stream, 0) - record_count_by_stream_0.get(stream, 0), # TODO should these be equal?
+                                    record_count_other_boards,
+                                    msg="Expected to have exactly {} records difference for {}".format(record_count_other_boards, stream)
             )
+
+            # # Verify the new object is not caught by the recent sync. Even though
+            # data_0 = synced_records_0.get(stream, [])
+            # record_messages_0 = [row.get('data').get('id')for row in data_0['messages']]
+            # import pdb; pdb.set_trace()
+            # for obj in new_objects.get(stream, []):
+            #     self.assertTrue(obj not in record_messages_0)
 
         ##########################################################################
         ### Testing interrupted sync state_1 without date-windowing
@@ -360,9 +377,9 @@ class TrelloBookmarkStates(unittest.TestCase):
             print("Bookmarks meet expectations")
 
             # Verify the smaller window replicates less data 
-            self.assertLess(record_count_by_stream_1.get(stream, 0),
-                            record_count_by_stream.get(stream, 0),
-                            msg="Expected to have more records for {}".format(stream)
+            self.assertLessEqual(record_count_by_stream_1.get(stream, 0),
+                                 record_count_by_stream.get(stream, 0),
+                                 msg="Expected to have more records for {}".format(stream)
             )
             # Verify the new actions are caught in this sync
             data_1 = synced_records_1.get(stream)
@@ -418,57 +435,8 @@ class TrelloBookmarkStates(unittest.TestCase):
             )
 
         ##########################################################################
-        ### Testing interrupted sync state_4
+        ### CLEAN UP
         ##########################################################################
-        version_4 = menagerie.get_state_version(conn_id)
-
-        # Set window_end based off current time
-        window_end_4 = dt.utcnow().strftime(self.TEST_TIME_FORMAT)
-        states_to_test[4]['bookmarks']['actions']['window_end'] = window_end_4
-
-        # Set sub_window_end to start_date
-        sub_window_end_4 = dt.strptime(self.START_DATE, self.START_DATE_FORMAT)
-        states_to_test[4]['bookmarks']['actions']['sub_window_end'] = sub_window_end_4.strftime(self.TEST_TIME_FORMAT)
-
-        # Set window_start to yesterday
-        window_start_4 = dt.strptime(self.START_DATE, self.START_DATE_FORMAT) - timedelta(days=1)
-        states_to_test[4]['bookmarks']['actions']['window_start'] = window_start_4.strftime(self.TEST_TIME_FORMAT)
-
-        print("Interjecting test state:\n{}".format(states_to_test[4]))
-        menagerie.set_state(conn_id, states_to_test[4], version_4)
-
-        # Run another sync (state_4)
-        print("Running sync job 4")
-        sync_job_name_4 = runner.run_sync_mode(self, conn_id)
-
-        #verify tap and target exit codes
-        exit_status_4 = menagerie.get_exit_status(conn_id, sync_job_name_4)
-        menagerie.verify_sync_exit_status(self, exit_status_4, sync_job_name_4)
-
-        # verify data was replicated
-        record_count_by_stream_4 = runner.examine_target_output_file(
-            self, conn_id, self.expected_sync_streams(), self.expected_pks()
-        )
-        replicated_row_count_4 =  reduce(lambda accum,c : accum + c, record_count_by_stream_4.values())
-        self.assertGreater(replicated_row_count_4, 0,
-                           msg="failed to replicate any data: {}".format(record_count_by_stream_4))
-        print("total replicated row count: {}".format(replicated_row_count_4))
-        synced_records_4 = runner.get_records_from_target_output()
-        state_4 = menagerie.get_state(conn_id)
-
-        # Test cases for state_4
-        for stream in self.expected_incremental_sync_streams():
-            # Verify bookmarks were saved as expected inc streams
-            self.assertTrue(state_4.get('bookmarks', {}).get(stream, {}).get('window_start', {}))
-            print("Bookmarks meet expectations")
-
-            # Verify no data was replicated for incremental streams
-            # self.assertEqual(
-            #     record_count_by_stream_4.get(stream, 0), 0,
-            #     msg="Expected not to replicate inc streams for state:\n{}".format(states_to_test[4])
-            # )
-
-        # CLEAN UP
         stream_to_delete = 'boards'
         boards_remaining = 5
         print("Deleting all but {} records for stream {}.".format(boards_remaining, stream_to_delete))

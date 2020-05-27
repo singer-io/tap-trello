@@ -47,10 +47,11 @@ BASE_URL = "https://api.trello.com/1"
 HEADERS = {
     'Content-Type': 'application/json',
 }
+SINCE = dt.strftime(dt.utcnow(), "%Y-%m-%dT00:00:00Z")
 PARAMS = (
     ('key', '{}'.format(os.getenv('TAP_TRELLO_CONSUMER_KEY'))),
     ('token', '{}'.format(os.getenv('TAP_TRELLO_TESTING_TOKEN'))),
-    ('limit', '{}'.format(MAX_API_LIMIT))
+    ('limit', '{}'.format(MAX_API_LIMIT)),
 )
 
 ##########################################################################
@@ -94,7 +95,7 @@ def get_objects_users(obj_type: str='users', obj_id: str = "", parent_id: str = 
 
     return user_objects
 
-def get_objects(obj_type: str, obj_id: str = "", parent_id: str = ""):
+def get_objects(obj_type: str, obj_id: str = "", parent_id: str = "", since = None):
     """
     get all objects for a given object
     -  or -
@@ -104,16 +105,19 @@ def get_objects(obj_type: str, obj_id: str = "", parent_id: str = ""):
         return get_objects_users(obj_id=obj_id, parent_id=parent_id)
 
     print(" * Test Data |  Request: GET on /{}/{}".format(obj_type, obj_id))
+
     endpoint = get_url_string("get", obj_type, obj_id, parent_id)
-    resp = requests.get(url=endpoint, headers=HEADERS, params=PARAMS)
+    parameters = PARAMS
+    if since:
+        parameters = PARAMS + (('since', since),)
+    resp = requests.get(url=endpoint, headers=HEADERS, params=parameters)
 
     if resp.status_code >= 400:
-        logging.warn("Request Failed {} \n    {}".format(resp.status_code, resp.text))
+       logging.warn("Request Failed {} \n    {}".format(resp.status_code, resp.text))
 
-        return None
+       return None
 
     return resp.json()
-
 
 def get_random_object_id(obj_type: str):
     """Return the id of a random object for a specified object_type"""
@@ -212,7 +216,7 @@ def get_url_string(req: str, obj_type: str, obj_id: str = "", parent_id: str = "
     return url_string
 
 
-def get_total_record_count_and_objects(child_stream: str=""):
+def get_total_record_count_and_objects(child_stream: str="", since = None):
     """
     : param child_stream: 
     Return the count and all records of a given child stream
@@ -222,7 +226,7 @@ def get_total_record_count_and_objects(child_stream: str=""):
     parent_stream = get_parent_stream(child_stream)
 
     if not PARENT_OBJECTS:
-        PARENT_OBJECTS = get_objects(obj_type=parent_stream)
+        PARENT_OBJECTS = get_objects(obj_type=parent_stream, since=since)
 
     # If true, then this stream is top level so just need 1 get ^
     if parent_stream == child_stream:
@@ -231,7 +235,7 @@ def get_total_record_count_and_objects(child_stream: str=""):
     count = 0
     existing_objects = []
     for obj in PARENT_OBJECTS:
-        objects = get_objects(obj_type=child_stream, parent_id=obj.get('id'))
+        objects = get_objects(obj_type=child_stream, parent_id=obj.get('id'), since=since)
         for obj in objects:
             already_tracked = False
             for e_obj in existing_objects:
@@ -311,7 +315,7 @@ def get_test_data():
 ##########################################################################
 ### Utils for updating existing test data
 ##########################################################################
-def update_object(obj_type: str, obj_id: str = '', parent_id: str = '', field_to_update: str = 'name'):
+def update_object(obj_type: str, obj_id: str = '', parent_id: str = '', field_to_update: str = ''):
     """
     update an existing object in order to genereate a new 'actions' record
     """
@@ -319,13 +323,43 @@ def update_object(obj_type: str, obj_id: str = '', parent_id: str = '', field_to
     
     if not obj_id:
         obj_id = get_random_object_id(obj_type)
-    
+
+    if obj_type == "user":
+        return update_object_user(obj_id, parent_id, field_to_update)
+
+    elif obj_type == "boards":
+        return update_object_board(obj_id, field_to_update)
+
     data = stream_to_data_mapping(obj_type)
     if data:
         if data.get(field_to_update):
             data_to_update = {field_to_update: data.get(field_to_update)} # just change the name for baords (actions)
         data_to_update = {field_to_update: "admin"} # add member to a board for users
         endpoint = get_url_string("put", obj_type, obj_id, parent_id)
+        print(" * Test Data | Changing: {} ".format(data_to_update))
+        resp = requests.put(url=endpoint, headers=HEADERS, params=PARAMS, json=data_to_update)
+        if resp.status_code >= 400:
+            logging.warn("Request Failed {} \n    {}".format(resp.status_code, resp.text))
+            return None
+
+        return resp.json()
+
+    raise NotImplementedError
+
+def update_object_board(obj_id: str = '', field_to_update: str = 'name'):
+    """Update a user by adding them to a board, parent_id should be specified"""
+    while not obj_id or obj_id == NEVER_DELETE_BOARD_ID:
+        obj_id = get_random_object_id('boards')
+
+    if obj_id == NEVER_DELETE_BOARD_ID:
+        logging.warn("Request Ignored |  You tried to change a board that other tests rely on |  " +\
+                     "Board (id={}) should not be altered".format(NEVER_DELETE_BOARD_ID))
+        raise Exception("We do not have enough boards. We are being forced to update board named 'NEVER DELETE'")
+
+    data = stream_to_data_mapping('boards')
+    if data:
+        data_to_update = {field_to_update: data.get(field_to_update)}
+        endpoint = get_url_string('put', 'boards', obj_id, '')
         print(" * Test Data | Changing: {} ".format(data_to_update))
         resp = requests.put(url=endpoint, headers=HEADERS, params=PARAMS, json=data_to_update)
         if resp.status_code >= 400:
