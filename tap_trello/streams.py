@@ -200,7 +200,7 @@ class Stream:
         if additional_params is None:
             additional_params = {}
 
-        custom_fields_map, dropdown_fields_map = self.build_custom_fields_maps(parent_id_list=format_values)
+        custom_fields_map, dropdown_options_map = self.build_custom_fields_maps(parent_id_list=format_values)
 
         # Boards, Users, and Lists don't handle an api limit key
         # Passing in None doesn't change the response (no 400 returned)
@@ -220,7 +220,7 @@ class Stream:
             )
 
         for rec in records:
-            yield self.modify_record(rec, parent_id_list = format_values, custom_fields_map = custom_fields_map, dropdown_fields_map = dropdown_fields_map)
+            yield self.modify_record(rec, parent_id_list = format_values, custom_fields_map = custom_fields_map, dropdown_options_map = dropdown_options_map)
 
 
     def sync(self):
@@ -240,18 +240,19 @@ class AddCustomFields(Mixin):
             custom_fields_map[custom_field['id']] = custom_field['name']
             if custom_field['type'] == 'list':
                 for dropdown_option in custom_field['options']:
-                    dropdown_options_map[dropdown_option['id']] = dropdown_option['value']['text']
+                    dropdown_options_map[dropdown_option['idCustomField'] + '_' + dropdown_option['id']] = dropdown_option['value']['text']
 
         return custom_fields_map, dropdown_options_map
 
 
     def modify_record(self, record, **kwargs): # pylint: disable=no-self-use
         custom_fields_map = kwargs['custom_fields_map']
-        dropdown_fields_map = kwargs['dropdown_fields_map']
+        dropdown_options_map = kwargs['dropdown_options_map']
         for custom_field in record['customFieldItems']:
             custom_field['name'] = custom_fields_map[custom_field['idCustomField']]
             if custom_field.get('idValue', None):
-                custom_field['value'] = {'option': dropdown_fields_map[custom_field['idValue']]}
+                custom_field['value'] = {'option': dropdown_options_map[custom_field['idCustomField'] + '_' + custom_field['idValue']]}
+
         return record
 
 

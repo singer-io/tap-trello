@@ -10,13 +10,94 @@
         "string"
       ]
     },
-    "checkItemStates": {
+    "customFieldItems": {
       "type": [
         "null",
         "array"
       ],
       "items": {
+        "type": [
+          "null",
+          "object"
+        ],
+        "properties": {
+          "id": {
+            "type": [
+              "null",
+              "string"
+            ]
+          },
+          "idValue": {
+            "type": [
+              "null",
+              "string"
+            ]
+          },
+          "idCustomField": {
+            "type": [
+              "null",
+              "string"
+            ]
+          },
+          "idModel": {
+            "type": [
+              "null",
+              "string"
+            ]
+          },
+          "modelType": {
+            "type": [
+              "null",
+              "string"
+            ]
+          },
+          "value": {
+            "type": [
+              "null",
+              "object"
+            ],
+            "properties": {
+              "checked": {
+                "type": [
+                  "null",
+                  "string"
+                ]
+              },
+              "date": {
+                "type": [
+                  "null",
+                  "string"
+                ]
+              },
+              "number": {
+                "type": [
+                  "null",
+                  "string"
+                ]
+              },
+              "text": {
+                "type": [
+                  "null",
+                  "string"
+                ]
+              },
+              "option": {
+                "type": [
+                  "null",
+                  "string"
+                ]
+              }
+            }
+          }
+        }
       }
+    },
+    "checkItemStates": {
+      "type": [
+        "null",
+        "array"
+      ],
+      "items": null
     },
     "closed": {
       "type": [
