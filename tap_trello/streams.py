@@ -228,6 +228,8 @@ class AddCustomFields(Mixin):
     def build_custom_fields_map(self, **kwargs):
         custom_fields_map = {}
         board_id_list = kwargs['parent_id_list']
+        # The custom fields are defined on the board level, so this function is called on a per-board basis
+        # Therefore, we assert that only one board is being passed in
         assert len(board_id_list) == 1
         custom_fields = self.client.get('/boards/{}/customFields'.format(board_id_list[0])) # pylint: disable=no-member
         for custom_field in custom_fields:
