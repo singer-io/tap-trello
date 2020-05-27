@@ -190,17 +190,15 @@ class Stream:
     def modify_record(self, record, **kwargs): # pylint: disable=no-self-use,unused-argument
         return record
 
-    def build_custom_fields_map(self):
+    def build_custom_fields_map(self, **kwargs): # pylint: disable=no-self-use,unused-argument
         return {}
 
     def get_records(self, format_values, additional_params=None):
-        import ipdb; ipdb.set_trace()
-        1+1
         if additional_params is None:
             additional_params = {}
 
-        custom_fields_id_to_name = self.build_custom_fields_map()
-            
+        custom_fields_map = self.build_custom_fields_map(parent_id_list=format_values)
+
         # Boards, Users, and Lists don't handle an api limit key
         # Passing in None doesn't change the response (no 400 returned)
         records = self.client.get(
@@ -219,7 +217,7 @@ class Stream:
             )
 
         for rec in records:
-            yield self.modify_record(rec, parent_id_list = format_values, custom_fields_map = custom_fields_id_to_name)
+            yield self.modify_record(rec, parent_id_list = format_values, custom_fields_map = custom_fields_map)
 
 
     def sync(self):
@@ -228,21 +226,22 @@ class Stream:
 
 class AddCustomFields(Mixin):
     def build_custom_fields_map(self, **kwargs):
-        fields_map = {}
-        boardIdList = kwargs['parent_id_list']
-        assert len(boardIdList) == 1
-        customFields = self.client.get('https://api.trello.com/1/boards/{}/customFields', boardIdList[0])
+        custom_fields_map = {}
+        board_id_list = kwargs['parent_id_list']
+        assert len(board_id_list) == 1
+        custom_fields = self.client.get('/boards/{}/customFields'.format(board_id_list[0])) # pylint: disable=no-member
         for custom_field in custom_fields:
-            fields_map[custom_field['id']] = custom_field['name']
-        
+            custom_fields_map[custom_field['id']] = custom_field['name']
+        return custom_fields_map
 
-    def modify_record(self, record, **kwargs):
+
+    def modify_record(self, record, **kwargs): # pylint: disable=no-self-use
         custom_fields_map = kwargs['custom_fields_map']
         for custom_field in record['customFieldItems']:
             custom_field['name'] = custom_fields_map[custom_field['idCustomField']]
         return record
 
-    
+
 
 class AddBoardId(Mixin):
     def modify_record(self, record, **kwargs): # pylint: disable=no-self-use
@@ -346,7 +345,7 @@ class Actions(DateWindowPaginated, ChildStream):
     MAX_API_RESPONSE_SIZE = 1000
     params = {'limit': 1000}
 
-class Cards(ChildStream):
+class Cards(AddCustomFields, ChildStream):
     stream_id = "cards"
     stream_name = "cards"
     endpoint = "/boards/{}/cards/all"
