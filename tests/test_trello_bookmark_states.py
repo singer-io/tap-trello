@@ -15,19 +15,21 @@ class TrelloBookmarkStates(unittest.TestCase):
     START_DATE = ""
     START_DATE_FORMAT = "%Y-%m-%dT00:00:00Z"
     TEST_TIME_FORMAT = "%Y-%m-%dT%H:%M:%S.%fZ"
+    LOOKBACK_WINDOW = 1  # days
+    TEST_BOARD_ID = utils.NEVER_DELETE_BOARD_ID
     ACTIONS_STATES = {
         "state_0": {  # State of interrupted sync for Inc streams
-            "parent_id": utils.NEVER_DELETE_BOARD_ID,
+            "parent_id": TEST_BOARD_ID,
             "window_start": 0, "sub_window_end": 0, "window_end": 0
         },
         "state_1": {  # State of interrupted sync for Full Table streams
-            "window_start": 0, "window_end": 0,"parent_id": utils.NEVER_DELETE_BOARD_ID
+            "window_start": 0, "window_end": 0,"parent_id": TEST_BOARD_ID
         },
         "state_2": {  # Final state after standard sync
             "window_start": 0,
         },
         "state_3": {  # Set window_start = window_end
-            "parent_id": utils.NEVER_DELETE_BOARD_ID,
+            "parent_id": TEST_BOARD_ID,
             "window_start": 0, "window_end": 0
         },  # ERROR STATES BELOW
         # "state_4": {  # Valid bookmark states but missing a parent_id
@@ -61,6 +63,16 @@ class TrelloBookmarkStates(unittest.TestCase):
             'access_token': os.getenv('TAP_TRELLO_ACCESS_TOKEN'),
             'access_token_secret': os.getenv('TAP_TRELLO_ACCESS_TOKEN_SECRET'),
         }
+
+    def get_tap_sorted_stream(self, stream: str = 'boards'):
+        """The tap sorts parent objects in created at ascending order"""
+        objs = utils.get_objects(obj_type=stream)
+        obj_id_list = [obj.get('id') for obj in objs]
+
+        id_created_dict = {obj_id: dt.fromtimestamp(int(obj_id[0:8],16))
+                           for obj_id in obj_id_list}
+
+        return sorted(id_created_dict.items())
 
     def untestable_streams(self):
         return {
@@ -263,16 +275,22 @@ class TrelloBookmarkStates(unittest.TestCase):
         ##########################################################################
         ### Testing interrupted sync state_0 with date-windowing
         ##########################################################################
-        # Generate a new actions object for setting expectations
-        # new_objects = {x: [] for x in self.expected_incremental_sync_streams()}
-        # for stream in self.expected_incremental_sync_streams():
-        #     new_objects[stream].append(utils.create_object(stream).get('id'))
-
         version_0 = menagerie.get_state_version(conn_id)
 
+        # Set parent_id to id of last baord the tap will replicate
+        sorted_parent_objs = self.get_tap_sorted_stream()
+        last_created_parent_id, _ = sorted_parent_objs[-1]
+        states_to_test[0]['bookmarks']['actions']['parent_id'] = last_created_parent_id
+
+        # Generate a new actions object prior to sync
+        new_objects = {x: [] for x in self.expected_incremental_sync_streams()}
+        for stream in self.expected_incremental_sync_streams():
+            new_obj = utils.create_object(stream, parent_id=last_created_parent_id)
+            new_objects[stream].append(new_obj.get('id'))
+
         # Set window_end based off current time
-        # window_end_0 = dt.utcnow().strftime(self.TEST_TIME_FORMAT)
-        window_end_0 = state['bookmarks']['actions']['window_start']
+        window_end_0 = dt.utcnow().strftime(self.TEST_TIME_FORMAT)
+        # window_end_0 = state['bookmarks']['actions']['window_start']
         states_to_test[0]['bookmarks']['actions']['window_end'] = window_end_0
 
         # Set sub_window_end to today
@@ -312,32 +330,42 @@ class TrelloBookmarkStates(unittest.TestCase):
             self.assertTrue(state_0.get('bookmarks', {}).get(stream, {}).get('window_start', {}))
             print("Bookmarks for {} meet expectations".format(stream))
 
-            # Verify the original sync catches more data since current state bookmarks on the oldest board
+            # Verify the original sync catches more data since current test state bookmarks on the most recent board
             self.assertGreater(record_count_by_stream.get(stream, 0),
                                record_count_by_stream_0.get(stream, 0),
                                msg="Expected to have more records for {}".format(stream)
             )
+            # TODO | determine if BUG
+            # Verify sync 0 only replicates data from the bookmarked parent object (the most recently creted board)
+            start_date_minus_one = (  # Include lookback window
+                dt.strptime(self.START_DATE, self.START_DATE_FORMAT) - timedelta(days=self.LOOKBACK_WINDOW)
+            ).strftime(self.START_DATE_FORMAT)
+            record_count_state_board = len(utils.get_objects(stream, parent_id=last_created_parent_id, since=start_date_minus_one))
+            # self.assertEqual(record_count_state_board, record_count_by_stream_0.get(stream, 0),
+            #                  msg="Sync 0 should only replicate data from the most recently creted board.")
 
-            # Verify the difference in sync matches the number of records on all other boards
-            # record_count_all_boards, _ = utils.get_total_record_count_and_objects(child_stream=stream, since=self.START_DATE)
-            # record_count_state_board = len(utils.get_objects(stream, parent_id=utils.NEVER_DELETE_BOARD_ID, since=self.START_DATE))
-            # record_count_other_boards = record_count_all_boards - record_count_state_board
-            # self.assertGreaterEqual(record_count_by_stream.get(stream, 0) - record_count_by_stream_0.get(stream, 0), # TODO should these be equal?
-            #                         record_count_other_boards,
-            #                         msg="Expected to have exactly {} records difference for {}".format(record_count_other_boards, stream)
-            # )
-
-            # # Verify the new object is not caught by the recent sync. Even though
+            # Verify the difference in syncs matches is greater than or equal to the number of records on all other boards
+            # NOTE: It must be ">=" rather than "=" because the lookback window will grab records from ()start_date - 1 day)
+            record_count_all_boards, _ = utils.get_total_record_count_and_objects(child_stream=stream, since=self.START_DATE)
+            record_count_other_boards = record_count_all_boards - record_count_state_board
+            self.assertGreaterEqual(record_count_by_stream.get(stream, 0) - record_count_by_stream_0.get(stream, 0),
+                                    record_count_other_boards,
+                                    msg="Expected to have at least {} records difference for {}".format(record_count_other_boards, stream)
+            )
+            # TODO | determine if BUG
+            # Verify the new object is caught by the recent sync
             # data_0 = synced_records_0.get(stream, [])
-            # record_messages_0 = [row.get('data').get('id')for row in data_0['messages']]
-            # import pdb; pdb.set_trace()
+            # record_messages_0 = [row.get('data').get('id') for row in data_0['messages']]
             # for obj in new_objects.get(stream, []):
-            #     self.assertTrue(obj not in record_messages_0)
+            #     self.assertTrue(obj.get('id') in record_messages_0)
 
         ##########################################################################
         ### Testing interrupted sync state_1 without date-windowing
         ##########################################################################
         version_1 = menagerie.get_state_version(conn_id)
+
+        # Set parent_id to id of last baord the tap will replicate
+        states_to_test[1]['bookmarks']['actions']['parent_id'] = last_created_parent_id
 
         # Set window_end based off current time
         window_end_1 = dt.utcnow().strftime(self.TEST_TIME_FORMAT)
@@ -389,6 +417,9 @@ class TrelloBookmarkStates(unittest.TestCase):
         ### Testing standard sync state_3
         ##########################################################################
         version_3 = menagerie.get_state_version(conn_id)
+
+        # Set parent_id to id of last baord the tap will replicate
+        states_to_test[3]['bookmarks']['actions']['parent_id'] = last_created_parent_id
 
         # Set window_end based off current time
         window_end_3 = state_2['bookmarks']['actions']['window_start']
