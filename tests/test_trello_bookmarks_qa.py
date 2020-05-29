@@ -91,7 +91,7 @@ class TrelloBookmarksQA(unittest.TestCase):
             'users' : {'id', 'boardId'},
             'lists' : {'id'},
             'actions' : {'id', 'date'},
-            'cards' : {'id'),
+            'cards' : {'id'},
             'checklists' : {'id'}
         }
 
