@@ -364,6 +364,7 @@ class Actions(DateWindowPaginated, ChildStream):
     parent_class = Boards
     MAX_API_RESPONSE_SIZE = 1000
     params = {'limit': 1000}
+    replication_keys = ["date"]
 
 class Cards(AddCustomFields, ChildStream):
     stream_id = "cards"
