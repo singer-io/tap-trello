@@ -31,11 +31,11 @@ def do_discover():
         # create and add catalog entry
         stream = STREAM_OBJECTS[stream_name]
         mdata = metadata.get_standard_metadata(
-                schema=schema,
-                key_properties=stream.key_properties,
-                valid_replication_keys=stream.replication_keys,
-                replication_method=stream.replication_method,
-            )
+            schema=schema,
+            key_properties=stream.key_properties,
+            valid_replication_keys=stream.replication_keys,
+            replication_method=stream.replication_method,
+        )
         mdata = metadata.to_map(mdata)
         for field_name in stream.replication_keys:
             metadata.write(mdata, ('properties', field_name), 'inclusion', 'automatic')
