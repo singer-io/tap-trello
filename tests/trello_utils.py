@@ -47,7 +47,8 @@ BASE_URL = "https://api.trello.com/1"
 HEADERS = {
     'Content-Type': 'application/json',
 }
-SINCE = dt.strftime(dt.utcnow(), "%Y-%m-%dT00:00:00Z")
+DATE_FORMAT = "%Y-%m-%dT00:00:00Z"
+SINCE = dt.strftime(dt.utcnow(), DATE_FORMAT)
 PARAMS = (
     ('key', '{}'.format(os.getenv('TAP_TRELLO_CONSUMER_KEY'))),
     ('token', '{}'.format(os.getenv('TAP_TRELLO_TESTING_TOKEN'))),
@@ -95,7 +96,7 @@ def get_objects_users(obj_type: str='users', obj_id: str = "", parent_id: str = 
 
     return user_objects
 
-def get_objects(obj_type: str, obj_id: str = "", parent_id: str = "", since = None):
+def get_objects(obj_type: str, obj_id: str = "", parent_id: str = "", since = None, custom_fields=False):
     """
     get all objects for a given object
     -  or -
@@ -103,10 +104,15 @@ def get_objects(obj_type: str, obj_id: str = "", parent_id: str = "", since = No
    """
     if obj_type == 'users': # Dispatch b/c this requires additional logic
         return get_objects_users(obj_id=obj_id, parent_id=parent_id)
-
+        
     print(" * Test Data |  Request: GET on /{}/{}".format(obj_type, obj_id))
 
     endpoint = get_url_string("get", obj_type, obj_id, parent_id)
+    if custom_fields:
+        if not obj_id:
+            raise Exception("Must specify an obj_id to acquire customFields")
+        endpoint += "/customFieldItems"
+
     parameters = PARAMS
     if since:
         parameters = PARAMS + (('since', since),)
@@ -119,7 +125,7 @@ def get_objects(obj_type: str, obj_id: str = "", parent_id: str = "", since = No
 
     return resp.json()
 
-def get_random_object_id(obj_type: str):
+def get_random_object_id(obj_type: str, parent_id: str = ""):
     """Return the id of a random object for a specified object_type"""
     global PARENT_OBJECTS  #, LIST_OBJECTS
 
@@ -128,11 +134,17 @@ def get_random_object_id(obj_type: str):
         return random.choice(user_ids)
 
     elif obj_type in ['cards', 'lists']:
-        objects = ""
-        while not objects: # Protect against boards without cards or lists
-            objects = get_objects(obj_type)
+        if not parent_id:
+            objects = ""
+            while not objects: # Protect against boards without cards or lists
+                objects = get_objects(obj_type)
+            random_object = objects[random.randint(0, len(objects) -1)]
+            return random_object.get('id')
+
+        objects = get_objects(obj_type, parent_id=parent_id)
         random_object = objects[random.randint(0, len(objects) -1)]
         return random_object.get('id')
+        
 
     elif obj_type == get_parent_stream(obj_type): # if boards
         if not PARENT_OBJECTS: # if we have not already done a get on baords
@@ -267,7 +279,7 @@ def get_test_data():
             "idOrganization": "",
             "idBoardSource": "",  # The id of a board to copy into the new board.
             "keepFromSource": "",  # To keep cards from the original board pass in the value cards (Valid values: cards, none)
-            "powerUps": "",  # One of: all, calendar, cardAging, recap, voting.
+            "powerUps": "customFields",  # One of: all, calendar, cardAging, recap, voting.
             "prefs_permissionLevel": "private",  # One of: org, private, public.
             "prefs_voting": "disabled",  # Who can vote on this board. One of disabled, members, observers, org, public.
             "prefs_comments": "members",  # Who can comment on cards on board. Oneof: disabled, members, observers, org, public.
@@ -310,7 +322,6 @@ def get_test_data():
     }
 
     return TEST_DATA
-
 
 ##########################################################################
 ### Utils for updating existing test data
@@ -519,7 +530,7 @@ def create_object_actions(recipient_stream: str = "boards", obj_id: str = "", ac
         return actions_objects[0]
 
     raise NotImplementedError
-    
+
 def create_object_boards(obj_type: str='boards'):
     global PARENT_OBJECTS
     print(" * Test Data | Request: POST on /{}/".format(obj_type))
@@ -559,11 +570,15 @@ def create_object_lists(obj_type: str='lists', parent_id=''):
 
     raise NotImplementedError
 
-def create_object_cards(obj_type: str='cards', parent_id=''):
+def create_object_cards(obj_type: str = 'cards', parent_id = '', custom = False):
     print(" * Test Data | Request: POST on /{}/".format(obj_type))
 
     data = stream_to_data_mapping(obj_type)
     if data:
+
+        if custom:
+            field, value = get_random_custom_field_and_value(parent_id=parent_id)
+            data[field] = value
 
         endpoint = get_url_string("post", obj_type)
         resp = requests.post(url=endpoint, headers=HEADERS, params=PARAMS, json=data)
@@ -576,7 +591,7 @@ def create_object_cards(obj_type: str='cards', parent_id=''):
 
     raise NotImplementedError
 
-def create_object(obj_type, obj_id: str = "", parent_id: str = "", action_type = None):
+def create_object(obj_type, obj_id: str = "", parent_id: str = "", action_type = None, custom = False):
     """
     Create a single record for a given object
 
@@ -598,7 +613,7 @@ def create_object(obj_type, obj_id: str = "", parent_id: str = "", action_type =
         return create_object_boards()
 
     elif obj_type == 'cards':
-        return create_object_cards(parent_id=parent_id)
+        return create_object_cards(parent_id=parent_id, custom=custom)
 
     elif obj_type == 'lists':
         return create_object_lists(parent_id=parent_id)
@@ -655,6 +670,95 @@ def reset_tracked_parent_objects():  # TODO Reset all tracked data if we end up 
     PARENT_OBJECTS = ""
     print(" * Test Data | RESETTING TRACKED PARENT OBJECTS")
     return
+    
+##########################################################################
+### Methods for custom fields
+##########################################################################
+def create_custom_field(obj_type: str = "boards", obj_id : str = "", field_type : str = "checkbox"):
+    """Create a new Custom Field on a board."""
+    global tstamp
+    tstamp = dt.utcnow().timestamp() # this is used to genereate unique data
+
+    if not field_type in ["checkbox", "list", "number", "text", "date"]:
+        raise NotImplementedError
+
+    while not obj_id :#or obj_id == NEVER_DELETE_BOARD_ID:
+        obj_id = get_random_object_id('boards')
+
+    endpoint = BASE_URL + "/customFields"
+    data = {
+        "idModel": "{}".format(obj_id),  # REQUIRED Pattern: ^[0-9a-fA-F]{32}$
+        "modelType": "board",  # REQUIRED type of model that the Custom Field is being defined on. This should always be board.
+        "name": "Custom {} {}".format(field_type, tstamp),  # REQUIRED The name of the Custom Field
+        "type": "{}".format(field_type),  # REQUIRED The type of Custom Field to create. Valid values: checkbox, list, number, text, date
+        "pos": "{}".format(random.randint(1,9999)),  # REQUIRED oneOf [string, number]
+        "display_cardFront": True,  # Whether this Custom Field should be shown on the front of Cards
+    }
+
+    if field_type =="list":
+        data['options'] = []
+        for i in range(random.randint(1,5)):
+            tstamp = dt.utcnow().timestamp()
+            data['options'].append(
+                {"value": {"text":"Option {} {}".format(i, tstamp)},
+                 "color":"{}".format(random.choice(["blue", "orange", "green", "red", "purple", "pink"])),
+                 "pos": "{}".format(random.randint(1,9999))},
+            )
+
+    print(" * Test Data | Creating: {} on {}".format(data.get('name'), obj_type))
+    resp = requests.post(url=endpoint, headers=HEADERS, params=PARAMS, json=data)
+    if resp.status_code >= 400:
+        logging.warn("Request Failed {} \n    {}".format(resp.status_code, resp.text))
+        return None
+    return resp.json()
+
+def update_custom_field(obj_type, obj_id, field_id):
+
+    print(" * Test Data | Update: use customField {} on {} {}".format(field_id, obj_type, obj_id))
+    endpoint = BASE_URL + "/{}/{}/customField/{}/item".format(obj_type, obj_id, field_id)
+    resp = requests.put(url=endpoint, headers=HEADERS, params=PARAMS)
+
+    if resp.status_code >= 400:
+        logging.warn("Request Failed {} \n    {}".format(resp.status_code, resp.text))
+        return None
+
+    return resp.json()
+
+def get_custom_fields(obj_type, obj_id):
+    print(" * Test Data | GET: get customFieldItems on {} {}".format(obj_type, obj_id))
+    endpoint = BASE_URL + "/{}/{}/customFields".format(obj_type, obj_id)
+    # parameters = PARAMS + (("customFieldItems", True),)
+    resp = requests.get(url=endpoint, headers=HEADERS, params=PARAMS)
+
+    if resp.status_code >= 400:
+        logging.warn("Request Failed {} \n    {}".format(resp.status_code, resp.text))
+        return None
+
+    return resp.json()
+
+def get_random_custom_field_and_value(obj_type="boards", parent_id=""):
+    global tstamp
+    tstamp = dt.utcnow().timestamp()
+
+    custom_field_data_map = {
+        "checkbox": "checkbox value {}".format(tstamp),
+        "date": "{}".format(dt.strftime(dt.utcnow(), DATE_FORMAT)),
+        "list": [],
+        "number": "{}".format(random.randint(0,9999)),
+        "text": "text value {}".format(tstamp),
+    }
+
+    cfields = get_custom_fields(obj_type, parent_id)
+    if not cfields:
+        raise NotImplementedError("Custom fields have not been created for this board")
+
+    random_cfield = cfields[random.randint(0, len(cfields) -1)]
+    field_type = random_cfield['type']
+    value = custom_field_data_map[field_type]
+    if field_type == 'list':
+        value = random.choice(random_cfield['options'])
+
+    return field_type, value
 
 ##########################################################################
 ### Testing the utils above

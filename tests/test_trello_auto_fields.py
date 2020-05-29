@@ -17,6 +17,7 @@ class TestTrelloAutomaticFields(unittest.TestCase):
     """Test that with no fields selected for a stream automatic fields are still replicated"""
     START_DATE = ""
     START_DATE_FORMAT = "%Y-%m-%dT00:00:00Z"
+    TEST_TIME_FORMAT = "%Y-%m-%dT%H:%M:%S.%fZ"
 
     def setUp(self):
         missing_envs = [x for x in [
@@ -44,7 +45,7 @@ class TestTrelloAutomaticFields(unittest.TestCase):
 
     def testable_streams(self):
         return {
-            # 'actions',
+            'actions',
             'boards',
             'checklists',
             'cards',
@@ -59,6 +60,20 @@ class TestTrelloAutomaticFields(unittest.TestCase):
             'checklists',
             'lists',
             'users'
+        }
+
+    def expected_full_table_streams(self):
+        return {
+            'boards',
+            'cards',
+            'checklists',
+            'lists',
+            'users',
+        }
+
+    def expected_incremental_streams(self):
+        return {
+            'actions'
         }
 
     def expected_sync_streams(self):
@@ -76,7 +91,7 @@ class TestTrelloAutomaticFields(unittest.TestCase):
 
     def expected_automatic_fields(self):
         return {
-            'actions' : {"id"},  #, "date"},
+            'actions' : {"id", "date"},
             'boards' : {"id"},
             'cards' : {'id'},
             'checklists': {'id'},
@@ -108,12 +123,6 @@ class TestTrelloAutomaticFields(unittest.TestCase):
                         del non_selected_properties[prop]
             additional_md = []
 
-            # if catalog['stream_name'] == 'actions':
-            #     catalog['metadata']['replication_key'] = 'date'
-            #     catalog['metadata']['replication-method'] = 'INCREMENTAL'
-            #     catalog['metadata']['inclusion'] = 'automatic'
-            #     # additional_md = [{ "breadcrumb" : [], "metadata" : {'replication-method' : 'INCREMENTAL', 'replication-key': 'date'}}]
-
             connections.select_catalog_and_fields_via_metadata(
                 conn_id, catalog, schema, additional_md=additional_md,
                 non_selected_fields=non_selected_properties.keys()
@@ -136,9 +145,12 @@ class TestTrelloAutomaticFields(unittest.TestCase):
 
         # ensure data exists for sync streams and set expectations
         expected_records = {x: [] for x in self.expected_sync_streams()} # ids by stream
-        #for stream in self.get_expected_sync_streams():
         for stream in self.testable_streams():
-            _, existing_objects = utils.get_total_record_count_and_objects(stream)
+            since = None
+            if stream in self.expected_incremental_streams():
+                since = dt.strptime(self.get_properties()['start_date'],
+                                    self.START_DATE_FORMAT).strftime(self.TEST_TIME_FORMAT)
+            _, existing_objects = utils.get_total_record_count_and_objects(stream, since=since)
             if existing_objects:
                 logging.info("Data exists for stream: {}".format(stream))
                 for obj in existing_objects:
@@ -172,30 +184,9 @@ class TestTrelloAutomaticFields(unittest.TestCase):
         self.assertEqual(len(diff), 0, msg="discovered schemas do not match: {}".format(diff))
         print("discovered schemas are OK")
 
-        # import pdb; pdb.set_trace()
-        # additional_md = [{"breadcrumb": [], "metadata": {'replication-method': 'INCREMENTAL',
-        #                                                  'replication-key': 'date'}}]
-        # connections.select_all_streams_and_fields(conn_id, found_catalogs, additional_md=additional_md)
-
         # Select all streams but only automtic fields
         self.select_all_streams_and_fields(conn_id, found_catalogs, select_all_fields=False)
 
-        ##########################################################################
-        ### WIP BELOW
-        ##########################################################################
-        #select certain... catalogs
-        # our_catalogs = [c for c in found_catalogs if c.get('tap_stream_id') in self.expected_sync_streams()]
-
-        # for cat in our_catalogs:
-        #     if cat['stream_name'] != 'actions':
-        #         continue
-        #     # replication_md = [{ "breadcrumb": ['properties', 'date'], "metadata": {'inclusion': 'automatic', 'replication-key': 'date', "replication-method" : "INCREMENTAL", "selected" : True}}]
-        #     replication_md = [{ "breadcrumb": [], "metadata": {'replication-key': 'date', "replication-method" : "INCREMENTAL"}}]
-        #     connections.set_non_discoverable_metadata(conn_id, cat, menagerie.get_annotated_schema(conn_id, cat['stream_id']), replication_md)
-
-        ##########################################################################
-        ### WIP ABOVE
-        ##########################################################################
         for cat in found_catalogs:
             catalog_entry = menagerie.get_annotated_schema(conn_id, cat['stream_id'])
             for k in self.expected_automatic_fields()[cat['stream_name']]:
@@ -231,33 +222,31 @@ class TestTrelloAutomaticFields(unittest.TestCase):
 
         for stream in self.testable_streams():
             with self.subTest(stream=stream):
-
-                # Verify that ONLY automatic fields are emitted given no fields were selected for replication
                 data = synced_records.get(stream)
                 record_messages_keys = [set(row['data'].keys()) for row in data['messages']]
                 expected_keys = self.expected_automatic_fields().get(stream)
 
-                # verify by keys
+                # Verify that ONLY automatic fields are emitted
                 for actual_keys in record_messages_keys:
                     self.assertEqual(
                         actual_keys.symmetric_difference(expected_keys), set(),
                         msg="Expected automatic fields and nothing else.")
-                    continue
 
-                # verify by values
                 actual_records = [row['data'] for row in data['messages']]
-                for actual_record in actual_records:
-                    self.assertTrue(actual_record in expected_records.get(stream),
-                                    msg="Actual record missing from expectations")
-                for expected_record in expected_records.get(stream):
-                    self.assertTrue(expected_record in actual_records,
-                                    msg="Expected record missing from target.")
 
                 # Verify the number of records match expectations
                 self.assertEqual(len(expected_records.get(stream)),
                                  len(actual_records),
                                  msg="Number of actual records do match expectations. " +\
                                  "We probably have duplicate records.")
+
+                # verify by values, that we replicated the expected records
+                for actual_record in actual_records:
+                    self.assertTrue(actual_record in expected_records.get(stream),
+                                    msg="Actual record missing from expectations")
+                for expected_record in expected_records.get(stream):
+                    self.assertTrue(expected_record in actual_records,
+                                    msg="Expected record missing from target.")
 
         # CLEAN UP
         stream_to_delete = 'boards'
@@ -273,7 +262,6 @@ class TestTrelloAutomaticFields(unittest.TestCase):
 
         # Reset the parent objects that we have been tracking
         utils.reset_tracked_parent_objects()
-        print("---------- TODOs still present. Not all streams are fully tested ----------")
 
 
 if __name__ == '__main__':
