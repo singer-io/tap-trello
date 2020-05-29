@@ -17,6 +17,13 @@ class TrelloBookmarkStates(unittest.TestCase):
     TEST_TIME_FORMAT = "%Y-%m-%dT%H:%M:%S.%fZ"
     LOOKBACK_WINDOW = 1  # days
     TEST_BOARD_ID = utils.NEVER_DELETE_BOARD_ID
+
+    """
+    Below we define the formatting for the various bookmark states. The actual values
+    are set in the test. These states should be considered as different possibilities
+    for a given sync NOT as continuations of each other.
+      e.g. sync_2 is a standard sync, sync_0 simulates a killed job in the middle of a sync
+    """
     ACTIONS_STATES = {
         "state_0": {  # State of interrupted sync for Inc streams
             "parent_id": TEST_BOARD_ID,
@@ -77,6 +84,7 @@ class TrelloBookmarkStates(unittest.TestCase):
     def untestable_streams(self):
         return {
             'users',
+            'boards'
         }
 
     def expected_check_streams(self):
@@ -120,7 +128,14 @@ class TrelloBookmarkStates(unittest.TestCase):
         }
 
     def expected_automatic_fields(self):
-        return self.expected_pks()
+        return {
+            'boards' : {'id'},
+            'users' : {'id', 'boardId'},
+            'lists' : {'id'},
+            'actions' : {'id'},
+            'cards' : {'id', 'date'},
+            'checklists':  {'id'}
+        }
 
     def get_properties(self):
         return {
@@ -277,16 +292,11 @@ class TrelloBookmarkStates(unittest.TestCase):
         ##########################################################################
         version_0 = menagerie.get_state_version(conn_id)
 
-        # Set parent_id to id of last baord the tap will replicate
+        # Set parent_id to id of second-to-last baord the tap will replicate
         sorted_parent_objs = self.get_tap_sorted_stream()
+        penultimate_created_parent_id, _ = sorted_parent_objs[-2]
         last_created_parent_id, _ = sorted_parent_objs[-1]
-        states_to_test[0]['bookmarks']['actions']['parent_id'] = last_created_parent_id
-
-        # Generate a new actions object prior to sync
-        new_objects = {x: [] for x in self.expected_incremental_sync_streams()}
-        for stream in self.expected_incremental_sync_streams():
-            new_obj = utils.create_object(stream, parent_id=last_created_parent_id)
-            new_objects[stream].append(new_obj.get('id'))
+        states_to_test[0]['bookmarks']['actions']['parent_id'] = penultimate_created_parent_id
 
         # Set window_end based off current time
         window_end_0 = dt.utcnow().strftime(self.TEST_TIME_FORMAT)
@@ -320,6 +330,7 @@ class TrelloBookmarkStates(unittest.TestCase):
         self.assertGreater(replicated_row_count_0, 0,
                            msg="failed to replicate any data: {}".format(record_count_by_stream_0))
         print("total replicated row count: {}".format(replicated_row_count_0))
+
         synced_records_0 = runner.get_records_from_target_output()
         
         # Test state_0
@@ -330,34 +341,22 @@ class TrelloBookmarkStates(unittest.TestCase):
             self.assertTrue(state_0.get('bookmarks', {}).get(stream, {}).get('window_start', {}))
             print("Bookmarks for {} meet expectations".format(stream))
 
-            # Verify the original sync catches more data since current test state bookmarks on the most recent board
+            # Verify the original sync catches more data since current test state bookmarks on the second most recent board
             self.assertGreater(record_count_by_stream.get(stream, 0),
                                record_count_by_stream_0.get(stream, 0),
                                msg="Expected to have more records for {}".format(stream)
             )
-            # TODO | determine if BUG
-            # Verify sync 0 only replicates data from the bookmarked parent object (the most recently creted board)
-            start_date_minus_one = (  # Include lookback window
-                dt.strptime(self.START_DATE, self.START_DATE_FORMAT) - timedelta(days=self.LOOKBACK_WINDOW)
-            ).strftime(self.START_DATE_FORMAT)
-            record_count_state_board = len(utils.get_objects(stream, parent_id=last_created_parent_id, since=start_date_minus_one))
-            # self.assertEqual(record_count_state_board, record_count_by_stream_0.get(stream, 0),
-            #                  msg="Sync 0 should only replicate data from the most recently creted board.")
 
-            # Verify the difference in syncs matches is greater than or equal to the number of records on all other boards
-            # NOTE: It must be ">=" rather than "=" because the lookback window will grab records from ()start_date - 1 day)
-            record_count_all_boards, _ = utils.get_total_record_count_and_objects(child_stream=stream, since=self.START_DATE)
-            record_count_other_boards = record_count_all_boards - record_count_state_board
-            self.assertGreaterEqual(record_count_by_stream.get(stream, 0) - record_count_by_stream_0.get(stream, 0),
-                                    record_count_other_boards,
-                                    msg="Expected to have at least {} records difference for {}".format(record_count_other_boards, stream)
-            )
-            # TODO | determine if BUG
-            # Verify the new object is caught by the recent sync
-            # data_0 = synced_records_0.get(stream, [])
-            # record_messages_0 = [row.get('data').get('id') for row in data_0['messages']]
-            # for obj in new_objects.get(stream, []):
-            #     self.assertTrue(obj.get('id') in record_messages_0)
+            # Verify sync 0 only replicates data from the bookmarked parent object (the most recently creted board)
+            record_count_last_board = len(utils.get_objects(stream, parent_id=last_created_parent_id, since=window_start_0))
+
+            record_count_penult_window_start = len(utils.get_objects(stream, parent_id=penultimate_created_parent_id, since=window_start_0))
+            record_count_penult_sub_window = len(utils.get_objects(stream, parent_id=penultimate_created_parent_id, since=sub_window_end_0))
+            record_count_penult_board = record_count_penult_window_start - record_count_penult_sub_window
+
+            expected_record_count_0 = record_count_penult_board + record_count_last_board
+            self.assertEqual(expected_record_count_0, record_count_by_stream_0.get(stream, 0),
+                             msg="Sync 0 should only replicate data from the most recently creted board.")
 
         ##########################################################################
         ### Testing interrupted sync state_1 without date-windowing
@@ -371,7 +370,7 @@ class TrelloBookmarkStates(unittest.TestCase):
         window_end_1 = dt.utcnow().strftime(self.TEST_TIME_FORMAT)
         states_to_test[1]['bookmarks']['actions']['window_end'] = window_end_1
 
-        # Set window_start to today
+        # Set window_start to today at midnight
         window_start_1 = dt.strptime(self.START_DATE, self.START_DATE_FORMAT) + timedelta(days=2)
         states_to_test[1]['bookmarks']['actions']['window_start'] = window_start_1.strftime(self.TEST_TIME_FORMAT)
 
@@ -399,9 +398,9 @@ class TrelloBookmarkStates(unittest.TestCase):
         # Test state_1
         print("Testing State 1")
         state_1 = menagerie.get_state(conn_id)
-        for stream in self.expected_incremental_sync_streams():
+        for stream in self.expected_full_table_sync_streams().difference(self.untestable_streams()):
             # Verify bookmarks were saved as expected inc streams
-            self.assertTrue(state_1.get('bookmarks', {}).get(stream, {}).get('window_start', {}))
+            self.assertEqual(state_1.get('bookmarks', {}).get(stream, {}).get('window_start', {}), {})
             print("Bookmarks meet expectations")
 
             # Verify the smaller window replicates less data 
@@ -409,9 +408,10 @@ class TrelloBookmarkStates(unittest.TestCase):
                                  record_count_by_stream.get(stream, 0),
                                  msg="Expected to have more records for {}".format(stream)
             )
-            # Verify the new actions are caught in this sync
-            data_1 = synced_records_1.get(stream)
-            record_messages_1 = [set(row['data']) for row in data_1['messages']]
+            # Verify the actions from today are caught in this sync
+            expected_record_count_1 = len(utils.get_objects(stream, parent_id=last_created_parent_id, since=window_start_1))
+            self.assertEqual(expected_record_count_1, record_count_by_stream_1.get(stream, 0),
+                                 msg="Should have less than or equal number of records based on whether we lookback.")
 
         ##########################################################################
         ### Testing standard sync state_3
@@ -458,12 +458,12 @@ class TrelloBookmarkStates(unittest.TestCase):
             # Verify bookmarks were saved as expected inc streams
             self.assertTrue(state_3.get('bookmarks', {}).get(stream, {}).get('window_start', {}))
             print("Bookmarks meet expectations")
-            # TODO this is no longer valid due to lookback window
+
             # Verify no data was replicated for incremental streams
-            # self.assertEqual(
-            #     record_count_by_stream_3.get(stream, 0), 0,
-            #     msg="Expected not to replicate inc streams for state:\n{}".format(states_to_test[3])
-            # )
+            self.assertEqual(
+                record_count_by_stream_3.get(stream, 0), 0,
+                msg="Expected not to replicate inc streams for state:\n{}".format(states_to_test[3])
+            )
 
         ##########################################################################
         ### CLEAN UP

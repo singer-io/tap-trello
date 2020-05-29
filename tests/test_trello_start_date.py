@@ -76,7 +76,14 @@ class TestTrelloStartDate(unittest.TestCase):
         }
 
     def expected_automatic_fields(self):
-        return self.expected_pks()
+        return {
+            "actions" : {"id"},
+            "boards" : {"id"},
+            "cards" : {"id", "date"},
+            "checklists" : {"id"},
+            "lists" : {"id"},
+            "users" : {"id", "boardId"}
+        }
 
     def tap_name(self):
         return "tap-trello"

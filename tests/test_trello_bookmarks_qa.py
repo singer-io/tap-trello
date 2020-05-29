@@ -86,7 +86,14 @@ class TrelloBookmarksQA(unittest.TestCase):
         }
 
     def expected_automatic_fields(self):
-        return self.expected_pks()
+        return {
+            'boards' : {'id'},
+            'users' : {'id', 'boardId'},
+            'lists' : {'id'},
+            'actions' : {'id'},
+            'cards' : {'id', 'date'},
+            'checklists' : {'id'}
+        }
 
     def get_properties(self):
         return {
