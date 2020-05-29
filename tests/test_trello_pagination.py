@@ -75,9 +75,9 @@ class TestTrelloPagination(unittest.TestCase):
 
     def expected_automatic_fields(self):
         return {
-            'actions' : {"id"},
+            'actions' : {"id", "date"},
             'boards' : {"id"},
-            'cards' : {"id", "date"},
+            'cards' : {"id"},
             'checklists': {"id"},
             'lists' : {"id"},
             'users' : {"id", "boardId"}

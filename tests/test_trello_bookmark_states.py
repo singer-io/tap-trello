@@ -132,8 +132,8 @@ class TrelloBookmarkStates(unittest.TestCase):
             'boards' : {'id'},
             'users' : {'id', 'boardId'},
             'lists' : {'id'},
-            'actions' : {'id'},
-            'cards' : {'id', 'date'},
+            'actions' : {'id', 'date'},
+            'cards' : {'id'},
             'checklists':  {'id'}
         }
 
