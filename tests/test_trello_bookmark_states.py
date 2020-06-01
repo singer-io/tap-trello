@@ -25,26 +25,20 @@ class TrelloBookmarkStates(unittest.TestCase):
       e.g. sync_2 is a standard sync, sync_0 simulates a killed job in the middle of a sync
     """
     ACTIONS_STATES = {
-        "state_0": {  # State of interrupted sync for Inc streams
+        "state_0": {  # Final state after standard sync
+            "window_start": 0,
+        },
+        "state_1": {  # State of interrupted sync for Inc streams
             "parent_id": TEST_BOARD_ID,
             "window_start": 0, "sub_window_end": 0, "window_end": 0
         },
-        "state_1": {  # State of interrupted sync for Full Table streams
+        "state_2": {  # State of interrupted sync for Full Table streams
             "window_start": 0, "window_end": 0,"parent_id": TEST_BOARD_ID
         },
-        "state_2": {  # Final state after standard sync
-            "window_start": 0,
-        },
-        "state_3": {  # Set window_start = window_end
+        "state_3": {  # Set window_start = window_end # TODO determine if state has value
             "parent_id": TEST_BOARD_ID,
             "window_start": 0, "window_end": 0
-        },  # ERROR STATES BELOW
-        # "state_4": {  # Valid bookmark states but missing a parent_id
-        #     "window_start": 0, "sub_window_end": 0, "window_end": 0
-        # },
-        # "state_5": {  # Set all bookmarks to None to exploit a potential oversight in 'on_window_started()'
-        #     "parent_id": utils.NEVER_DELETE_BOARD_ID
-        # },
+        },
     }
 
     def setUp(self):
@@ -161,7 +155,12 @@ class TrelloBookmarkStates(unittest.TestCase):
         records_to_create = 3
         expected_records = {x: [] for x in self.expected_sync_streams()} # ids by stream
         for stream in self.expected_sync_streams().difference(self.untestable_streams()):
-            _, existing_objects = utils.get_total_record_count_and_objects(stream)
+            if stream in self.expected_incremental_sync_streams():
+                since = dt.strptime(self.START_DATE, self.START_DATE_FORMAT).strftime(self.TEST_TIME_FORMAT)
+                _, existing_objects = utils.get_total_record_count_and_objects(stream, since=since)
+            else:
+                _, existing_objects = utils.get_total_record_count_and_objects(stream)
+
             if existing_objects:
                 logging.info("Data exists for stream: {}".format(stream))
                 for obj in existing_objects:  # add existing records to expectations
@@ -237,13 +236,146 @@ class TrelloBookmarkStates(unittest.TestCase):
 
         # TODO fix index nums in test and in ACTIONS_STATES above
         ##########################################################################
-        ### Testing standard sync state_2
+        ### Testing standard sync state_0
+        ##########################################################################
+        version_0 = menagerie.get_state_version(conn_id)
+
+        # Set window_start to start_date 
+        window_start_0 = dt.strptime(self.START_DATE, self.START_DATE_FORMAT)
+        states_to_test[0]['bookmarks']['actions']['window_start'] = window_start_0.strftime(self.TEST_TIME_FORMAT)
+
+        print("Interjecting test state:\n{}".format(states_to_test[0]))
+        menagerie.set_state(conn_id, states_to_test[0], version_0)
+
+        # Run another sync
+        print("Running sync job 0")
+        sync_job_name_0 = runner.run_sync_mode(self, conn_id)
+
+        #verify tap and target exit codes
+        exit_status_0 = menagerie.get_exit_status(conn_id, sync_job_name_0)
+        menagerie.verify_sync_exit_status(self, exit_status_0, sync_job_name_0)
+
+        # verify data was replicated
+        record_count_by_stream_0 = runner.examine_target_output_file(
+            self, conn_id, self.expected_sync_streams(), self.expected_pks()
+        )
+        replicated_row_count_0 =  reduce(lambda accum,c : accum + c, record_count_by_stream_0.values())
+        self.assertGreater(replicated_row_count_0, 0,
+                           msg="failed to replicate any data: {}".format(record_count_by_stream_0))
+        print("total replicated row count: {}".format(replicated_row_count_0))
+        synced_records_0 = runner.get_records_from_target_output()
+
+        # Test state_0
+        print("Testing State 0")
+        state_0 = menagerie.get_state(conn_id)
+        for stream in self.expected_incremental_sync_streams():
+            # Verify bookmarks were saved as expected inc streams
+            self.assertTrue(state_0.get('bookmarks', {}).get(stream, {}).get('window_start', {}))
+            print("Bookmarks meet expectations")
+        for stream in self.expected_sync_streams().difference(self.untestable_streams()):
+            data = synced_records.get(stream)
+            record_messages = [set(row['data']) for row in data['messages']]
+
+            data_0 = synced_records_0.get(stream)
+            record_messages_0 = [set(row['data']) for row in data_0['messages']]
+
+            # Verify we got the same number of records as the first sync
+            self.assertEqual(record_count_by_stream_0.get(stream), record_count_by_stream.get(stream),
+                             msg="Syncs should replicate the samee number of records")
+            self.assertEqual(record_messages_0, record_messages,
+                             msg="Syncs should replicate the samee number of records")
+
+            # Verify we got the exact same records as the first sync
+            for record_message in record_messages:
+                self.assertTrue(record_message in record_messages_0,
+                                msg="Expected {} to be in this sync.".format(record_message))
+
+        ##########################################################################
+        ### Testing interrupted sync state_1 with date-windowing
+        ##########################################################################
+        version_1 = menagerie.get_state_version(conn_id)
+
+        # Set parent_id to id of second-to-last baord the tap will replicate
+        sorted_parent_objs = self.get_tap_sorted_stream()
+        penultimate_created_parent_id, _ = sorted_parent_objs[-2]
+        last_created_parent_id, _ = sorted_parent_objs[-1]
+        states_to_test[1]['bookmarks']['actions']['parent_id'] = penultimate_created_parent_id
+
+        # Set window_end based off current time
+        window_end_1 = dt.utcnow().strftime(self.TEST_TIME_FORMAT)
+        # window_end_1 = state['bookmarks']['actions']['window_start']
+        states_to_test[1]['bookmarks']['actions']['window_end'] = window_end_1
+
+        # Set sub_window_end to today
+        sub_window_end_1 = dt.strptime(self.START_DATE, self.START_DATE_FORMAT) + timedelta(days=2)
+        states_to_test[1]['bookmarks']['actions']['sub_window_end'] = sub_window_end_1.strftime(self.TEST_TIME_FORMAT)
+
+        # Set window_start to start_date
+        window_start_1 = dt.strptime(self.START_DATE, self.START_DATE_FORMAT)
+        states_to_test[1]['bookmarks']['actions']['window_start'] = window_start_1.strftime(self.TEST_TIME_FORMAT)
+
+        print("Interjecting test state:\n{}".format(states_to_test[1]))
+        menagerie.set_state(conn_id, states_to_test[1], version_1)
+
+        # Run another sync (state_1)
+        print("Running sync job 1")
+        sync_job_name_1 = runner.run_sync_mode(self, conn_id)
+
+        #verify tap and target exit codes
+        exit_status_1 = menagerie.get_exit_status(conn_id, sync_job_name_1)
+        menagerie.verify_sync_exit_status(self, exit_status_1, sync_job_name_1)
+
+        # verify data was replicated
+        record_count_by_stream_1 = runner.examine_target_output_file(
+            self, conn_id, self.expected_sync_streams(), self.expected_pks()
+        )
+        replicated_row_count_1 =  reduce(lambda accum,c : accum + c, record_count_by_stream_1.values())
+        self.assertGreater(replicated_row_count_1, 0,
+                           msg="failed to replicate any data: {}".format(record_count_by_stream_1))
+        print("total replicated row count: {}".format(replicated_row_count_1))
+
+        synced_records_1 = runner.get_records_from_target_output()
+        
+        # Test state_1
+        print("Testing State 1")
+        state_1 = menagerie.get_state(conn_id)
+        for stream in self.expected_incremental_sync_streams():
+            # Verify bookmarks were saved as expected inc streams
+            self.assertTrue(state_1.get('bookmarks', {}).get(stream, {}).get('window_start', {}))
+            print("Bookmarks for {} meet expectations".format(stream))
+
+            # Verify the original sync catches more data since current test state bookmarks on the second most recent board
+            self.assertGreater(record_count_by_stream.get(stream, 0),
+                               record_count_by_stream_1.get(stream, 0),
+                               msg="Expected to have more records for {}".format(stream)
+            )
+
+            # Verify sync 1 only replicates data from the bookmarked parent object (the most recently creted board)
+            record_count_last_board = len(utils.get_objects(stream, parent_id=last_created_parent_id, since=window_start_1))
+
+            record_count_penult_window_start = len(utils.get_objects(stream, parent_id=penultimate_created_parent_id, since=window_start_1))
+            record_count_penult_sub_window = len(utils.get_objects(stream, parent_id=penultimate_created_parent_id, since=sub_window_end_1))
+            record_count_penult_board = record_count_penult_window_start - record_count_penult_sub_window
+
+            expected_record_count_1 = record_count_penult_board + record_count_last_board
+            self.assertEqual(expected_record_count_1, record_count_by_stream_1.get(stream, 0),
+                             msg="Sync 1 should only replicate data from the most recently creted board.")
+
+        ##########################################################################
+        ### Testing interrupted sync state_2 without date-windowing
         ##########################################################################
         version_2 = menagerie.get_state_version(conn_id)
 
-        # Set window_start to start_date 
-        window_start_2 = dt.strptime(self.START_DATE, self.START_DATE_FORMAT)
-        states_to_test[2]['bookmarks']['actions']['window_start'] = window_start_2.strftime(self.TEST_TIME_FORMAT)
+        # Set parent_id to id of last baord the tap will replicate
+        # Set window_end based off current time
+        window_end_2 = dt.utcnow().strftime(self.TEST_TIME_FORMAT)
+        # Set window_start to today at midnight
+        window_start_2 = dt.strptime(self.START_DATE, self.START_DATE_FORMAT) + timedelta(days=2)
+        states_to_test[2]['bookmarks']['actions'] = {}
+        for stream in self.expected_full_table_sync_streams().difference({'boards'}):
+            states_to_test[2]['bookmarks'][stream] = {'window_start': window_start_2.strftime(self.TEST_TIME_FORMAT),
+                                                      'window_end':  window_end_2,
+                                                      'parent_id': last_created_parent_id}
 
         print("Interjecting test state:\n{}".format(states_to_test[2]))
         menagerie.set_state(conn_id, states_to_test[2], version_2)
@@ -269,153 +401,21 @@ class TrelloBookmarkStates(unittest.TestCase):
         # Test state_2
         print("Testing State 2")
         state_2 = menagerie.get_state(conn_id)
-        for stream in self.expected_incremental_sync_streams():
-            # Verify bookmarks were saved as expected inc streams
-            self.assertTrue(state_2.get('bookmarks', {}).get(stream, {}).get('window_start', {}))
-            print("Bookmarks meet expectations")
-        for stream in self.expected_sync_streams().difference(self.untestable_streams()):
-            data = synced_records.get(stream)
-            record_messages = [set(row['data']) for row in data['messages']]
-            data_2 = synced_records_2.get(stream)
-            record_messages_2 = [set(row['data']) for row in data_2['messages']]
-
-            # Verify we got the same number of records as the first sync
-            self.assertEqual(record_count_by_stream_2.get(stream), record_count_by_stream.get(stream),
-                             msg="Syncs should replicate the samee number of records")
-            self.assertEqual(record_messages_2, record_messages,
-                             msg="Syncs should replicate the samee number of records")
-
-            # Verify we got the exact same records as the first sync
-            for record_message in record_messages:
-                self.assertTrue(record_message in record_messages_2,
-                                msg="Expected {} to be in this sync.".format(record_message))
-
-        ##########################################################################
-        ### Testing interrupted sync state_0 with date-windowing
-        ##########################################################################
-        version_0 = menagerie.get_state_version(conn_id)
-
-        # Set parent_id to id of second-to-last baord the tap will replicate
-        sorted_parent_objs = self.get_tap_sorted_stream()
-        penultimate_created_parent_id, _ = sorted_parent_objs[-2]
-        last_created_parent_id, _ = sorted_parent_objs[-1]
-        states_to_test[0]['bookmarks']['actions']['parent_id'] = penultimate_created_parent_id
-
-        # Set window_end based off current time
-        window_end_0 = dt.utcnow().strftime(self.TEST_TIME_FORMAT)
-        # window_end_0 = state['bookmarks']['actions']['window_start']
-        states_to_test[0]['bookmarks']['actions']['window_end'] = window_end_0
-
-        # Set sub_window_end to today
-        sub_window_end_0 = dt.strptime(self.START_DATE, self.START_DATE_FORMAT) + timedelta(days=2)
-        states_to_test[0]['bookmarks']['actions']['sub_window_end'] = sub_window_end_0.strftime(self.TEST_TIME_FORMAT)
-
-        # Set window_start to start_date
-        window_start_0 = dt.strptime(self.START_DATE, self.START_DATE_FORMAT)
-        states_to_test[0]['bookmarks']['actions']['window_start'] = window_start_0.strftime(self.TEST_TIME_FORMAT)
-
-        print("Interjecting test state:\n{}".format(states_to_test[0]))
-        menagerie.set_state(conn_id, states_to_test[0], version_0)
-
-        # Run another sync (state_0)
-        print("Running sync job 0")
-        sync_job_name_0 = runner.run_sync_mode(self, conn_id)
-
-        #verify tap and target exit codes
-        exit_status_0 = menagerie.get_exit_status(conn_id, sync_job_name_0)
-        menagerie.verify_sync_exit_status(self, exit_status_0, sync_job_name_0)
-
-        # verify data was replicated
-        record_count_by_stream_0 = runner.examine_target_output_file(
-            self, conn_id, self.expected_sync_streams(), self.expected_pks()
-        )
-        replicated_row_count_0 =  reduce(lambda accum,c : accum + c, record_count_by_stream_0.values())
-        self.assertGreater(replicated_row_count_0, 0,
-                           msg="failed to replicate any data: {}".format(record_count_by_stream_0))
-        print("total replicated row count: {}".format(replicated_row_count_0))
-
-        synced_records_0 = runner.get_records_from_target_output()
-        
-        # Test state_0
-        print("Testing State 0")
-        state_0 = menagerie.get_state(conn_id)
-        for stream in self.expected_incremental_sync_streams():
-            # Verify bookmarks were saved as expected inc streams
-            self.assertTrue(state_0.get('bookmarks', {}).get(stream, {}).get('window_start', {}))
-            print("Bookmarks for {} meet expectations".format(stream))
-
-            # Verify the original sync catches more data since current test state bookmarks on the second most recent board
-            self.assertGreater(record_count_by_stream.get(stream, 0),
-                               record_count_by_stream_0.get(stream, 0),
-                               msg="Expected to have more records for {}".format(stream)
-            )
-
-            # Verify sync 0 only replicates data from the bookmarked parent object (the most recently creted board)
-            record_count_last_board = len(utils.get_objects(stream, parent_id=last_created_parent_id, since=window_start_0))
-
-            record_count_penult_window_start = len(utils.get_objects(stream, parent_id=penultimate_created_parent_id, since=window_start_0))
-            record_count_penult_sub_window = len(utils.get_objects(stream, parent_id=penultimate_created_parent_id, since=sub_window_end_0))
-            record_count_penult_board = record_count_penult_window_start - record_count_penult_sub_window
-
-            expected_record_count_0 = record_count_penult_board + record_count_last_board
-            self.assertEqual(expected_record_count_0, record_count_by_stream_0.get(stream, 0),
-                             msg="Sync 0 should only replicate data from the most recently creted board.")
-
-        ##########################################################################
-        ### Testing interrupted sync state_1 without date-windowing
-        ##########################################################################
-        version_1 = menagerie.get_state_version(conn_id)
-
-        # Set parent_id to id of last baord the tap will replicate
-        # Set window_end based off current time
-        window_end_1 = dt.utcnow().strftime(self.TEST_TIME_FORMAT)
-        # Set window_start to today at midnight
-        window_start_1 = dt.strptime(self.START_DATE, self.START_DATE_FORMAT) + timedelta(days=2)
-        states_to_test[1]['bookmarks']['actions'] = {}
-        for stream in self.expected_full_table_sync_streams().difference({'boards'}):
-            states_to_test[1]['bookmarks'][stream] = {'window_start': window_start_1.strftime(self.TEST_TIME_FORMAT),
-                                                      'window_end':  window_end_1,
-                                                      'parent_id': last_created_parent_id}
-
-        print("Interjecting test state:\n{}".format(states_to_test[1]))
-        menagerie.set_state(conn_id, states_to_test[1], version_1)
-
-        # Run another sync
-        print("Running sync job 1")
-        sync_job_name_1 = runner.run_sync_mode(self, conn_id)
-
-        #verify tap and target exit codes
-        exit_status_1 = menagerie.get_exit_status(conn_id, sync_job_name_1)
-        menagerie.verify_sync_exit_status(self, exit_status_1, sync_job_name_1)
-
-        # verify data was replicated
-        record_count_by_stream_1 = runner.examine_target_output_file(
-            self, conn_id, self.expected_sync_streams(), self.expected_pks()
-        )
-        replicated_row_count_1 =  reduce(lambda accum,c : accum + c, record_count_by_stream_1.values())
-        self.assertGreater(replicated_row_count_1, 0,
-                           msg="failed to replicate any data: {}".format(record_count_by_stream_1))
-        print("total replicated row count: {}".format(replicated_row_count_1))
-        synced_records_1 = runner.get_records_from_target_output()
-
-        # Test state_1
-        print("Testing State 1")
-        state_1 = menagerie.get_state(conn_id)
         for stream in self.expected_full_table_sync_streams().difference(self.untestable_streams()):
             # Verify bookmarks were saved as expected inc streams
-            self.assertTrue(state_1.get('bookmarks', {}).get(stream, {}).get('window_start', {}),
+            self.assertTrue(state_2.get('bookmarks', {}).get(stream, {}).get('window_start', {}),
                             msg="{} should have a bookmark value".format(stream))
             print("Bookmarks meet expectations")
 
             # Verify the smaller window replicates less data 
-            self.assertLessEqual(record_count_by_stream_1.get(stream, 0),
+            self.assertLessEqual(record_count_by_stream_2.get(stream, 0),
                                  record_count_by_stream.get(stream, 0),
                                  msg="Expected to have more records for {}".format(stream)
             )
 
             # Verify the actions from today are caught in this sync
-            expected_record_count_1 = len(utils.get_objects(stream, parent_id=last_created_parent_id))
-            self.assertEqual(expected_record_count_1, record_count_by_stream_1.get(stream, 0),
+            expected_record_count_2 = len(utils.get_objects(stream, parent_id=last_created_parent_id))
+            self.assertEqual(expected_record_count_2, record_count_by_stream_2.get(stream, 0),
                                  msg="Should have less than or equal number of records based on whether we lookback.")
 
         ##########################################################################
