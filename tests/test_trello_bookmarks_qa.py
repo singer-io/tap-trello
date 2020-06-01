@@ -15,6 +15,8 @@ import trello_utils as utils
 class TrelloBookmarksQA(unittest.TestCase):
     START_DATE = ""
     START_DATE_FORMAT = "%Y-%m-%dT00:00:00Z"
+    TEST_TIME_FORMAT = "%Y-%m-%dT%H:%M:%S.%fZ"
+    LOOKBACK_WINODW = 1  # days
 
     def setUp(self):
         missing_envs = [x for x in [
@@ -96,8 +98,8 @@ class TrelloBookmarksQA(unittest.TestCase):
         }
 
     def get_properties(self):
-        return {
-            'start_date' : dt.strftime(dt.utcnow(), self.START_DATE_FORMAT),  # set to utc today
+        return {  # set to 2 days ago for testing lookback window
+            'start_date' : dt.strftime(dt.utcnow() - timedelta(days=2), self.START_DATE_FORMAT),
         }
 
     def test_run(self):
@@ -106,7 +108,13 @@ class TrelloBookmarksQA(unittest.TestCase):
         # ensure data exists for sync streams and set expectations
         expected_records_1 = {x: [] for x in self.expected_sync_streams()} # ids by stream
         for stream in self.expected_sync_streams().difference(self.untestable_streams()):
-            _, existing_objects = utils.get_total_record_count_and_objects(stream)
+            if stream in self.expected_incremental_sync_streams():
+                start_date = dt.strptime(self.get_properties().get('start_date'), self.START_DATE_FORMAT)
+                since = start_date.strftime(self.TEST_TIME_FORMAT)
+                _, existing_objects = utils.get_total_record_count_and_objects(stream, since=since)
+            else:
+                _, existing_objects = utils.get_total_record_count_and_objects(stream)
+
             if existing_objects:
                 logging.info("Data exists for stream: {}".format(stream))
                 for obj in existing_objects:  # add existing records to expectations
@@ -125,7 +133,9 @@ class TrelloBookmarksQA(unittest.TestCase):
         action_comments = []
         action_comments.append(utils.create_object('actions', action_type="comment"))
         action_comments.append(utils.create_object('actions', action_type="comment"))
-
+        for action in action_comments:
+            expected_records_1['actions'].append({field: action.get(field)
+                                                  for field in self.expected_automatic_fields().get(stream)})
         # run in check mode
         conn_id = connections.ensure_connection(self)
         check_job_name = runner.run_check_mode(self, conn_id)
@@ -184,18 +194,30 @@ class TrelloBookmarksQA(unittest.TestCase):
         # Generate data between syncs for bookmarking streams
         print("Generating more data prior to 2nd sync")
         expected_records_2 = {x: [] for x in self.expected_sync_streams()}
-        for stream in self.expected_sync_streams().difference(self.untestable_streams()):
+        for stream in self.expected_full_table_sync_streams().difference(self.untestable_streams()):
             for _ in range(1):
                 new_object = utils.create_object(stream)
                 expected_records_2[stream].append({field: new_object.get(field)
                                                    for field in self.expected_automatic_fields().get(stream)})
 
-        print("Updating existing data prior to 2nd sync")
         # Update a single comment action before second sync
+        print("Updating existing data prior to 2nd sync")
         updated_records = {x: [] for x in self.expected_sync_streams()}
-        obj_id_to_update = random.choice(action_comments).get('id')
-        updated_object = utils.update_object(stream, obj_id=obj_id_to_update)
-        updated_records[stream].append(updated_object)
+        action_id_to_update = random.choice(action_comments).get('id')
+        updated_action = utils.update_object_action(obj_id=action_id_to_update)
+        updated_records['actions'].append(updated_action)
+
+        # Get new actions from data manipulation between syncs
+        print("Acquriing in-test actions prior to 2nd sync")
+        for stream in self.expected_incremental_sync_streams().difference(self.untestable_streams()):
+            # state = dt.strptime(state_1.get('bookmarks').get(stream).get('window_start'), self.TEST_TIME_FORMAT)
+            # since = (state - timedelta(days=self.LOOKBACK_WINDOW)).strftime(self.TEST_TIME_FORMAT)
+            start_date = dt.strptime(self.get_properties().get('start_date'), self.START_DATE_FORMAT)
+            since = start_date.strftime(self.TEST_TIME_FORMAT)
+            _, objects = utils.get_total_record_count_and_objects(stream, since=since)
+            for obj in objects:
+                expected_records_2[stream].append({field: obj.get(field)
+                                                   for field in self.expected_automatic_fields().get(stream)})
 
         # Run another sync
         print("Running 2nd sync job")
@@ -257,8 +279,6 @@ class TrelloBookmarksQA(unittest.TestCase):
                                  expected_records_2_set,
                                  msg="We did not get the new record(s)")
 
-                # TODO assertions for updated data for each stream
-
         print("Full table streams tested.")
 
         # TESTING INCREMENTAL STREAMS
@@ -271,21 +291,11 @@ class TrelloBookmarksQA(unittest.TestCase):
                 self.assertGreater(record_count_1, 0)
                 self.assertGreater(record_count_2, 0)
 
-                if stream == 'actions':
-                    # Assert that we are capturing the expected number of records for inc streams
-                    self.assertLessEqual(record_count_1, len(expected_records_1.get(stream, [])),
-                                         msg="Stream {} replicated an unexpedted number records on 1st sync.".format(stream))
-                    # TODO Update 'since' in PARAMS to equal self.start_date. Then this ^ can change back to assertEqual
-                    self.assertGreaterEqual(record_count_2, len(expected_records_2.get(stream, [])),
-                                     msg="Stream {} replicated an unexpedted number records on 2nd sync.".format(stream))
-                    # TODO track created objects as actions in order to change ^ back to assertEqual
-                    continue
-
                 # Assert that we are capturing the expected number of records for inc streams
-                self.assertLessEqual(record_count_1, len(expected_records_1.get(stream, [])),
-                                     msg="Stream {} replicated an unexpedted number records on 1st sync.".format(stream))
+                self.assertEqual(record_count_1, len(expected_records_1.get(stream, [])),
+                                 msg="Stream {} replicated an unexpedted number records on 1st sync.".format(stream))
                 self.assertEqual(record_count_2, len(expected_records_2.get(stream, [])),
-                                 msg="Stream {} replicated an unexpedted number records on 2nd sync.".format(stream))
+                                        msg="Stream {} replicated an unexpedted number records on 2nd sync.".format(stream))
 
                 # Assert that we are capturing the expected records for inc streams
                 data_1 = synced_records_1.get(stream, [])
@@ -295,16 +305,37 @@ class TrelloBookmarksQA(unittest.TestCase):
                 for record in expected_records_1.get(stream):
                     self.assertTrue(record.get('id') in record_messages_1,
                                     msg="Missing an expected record from sync 1.")
-                    self.assertFalse(record.get('id') in record_messages_2,
-                                     msg="This record does not belong in this sync:" +\
-                                     "{}".format(record.get('id')))
-
+                    self.assertTrue(record.get('id') in record_messages_2,
+                                    msg="This record does not belong in this sync:" +\
+                                    "{}".format(record.get('id')))
                 for record in expected_records_2.get(stream):
                     self.assertTrue(record.get('id') in record_messages_2,
-                                    msg="Missing an expected record from sync 1.")
-                    self.assertFalse(record.get('id') in record_messages_1,
-                                     msg="This record does not belong in this sync:" +\
-                                     "{}".format(record.get('id')))
+                                    msg="Missing an expected record from sync 2.")
+
+                record_data_1 = [row.get('data') for row in data_1['messages']]
+                record_data_2 = [row.get('data') for row in data_2['messages']]
+
+                # Testing action comments (the only action type that can be updated)
+                for action in action_comments:
+
+                    # Get text value for action comment from sync 1
+                    original_action_text = ""
+                    for record in record_data_1:
+                        if record.get('id') == action.get('id'):
+                            original_action_text = record.get('data').get('text')
+                    assert original_action_text, "Record  {} is missing from 1st sync.".format(action.get('id'))
+                    # Get text value for action comment from sync 2
+                    for record in record_data_2:
+                        if record.get('id') == action.get('id'):
+                            current_action_text = record.get('data').get('text')
+                    assert current_action_text, "Record  {} is missing from 2nd sync.".format(action.get('id'))
+
+                    # Verify the action comment text matches expectations
+                    if action.get('id')== action_id_to_update:
+                        self.assertNotEqual(original_action_text, current_action_text, msg="Update was not captured.")
+                        self.assertIn("UPDATE", current_action_text, msg="Update was captured but not as expected.")
+                    else:
+                        self.assertEqual(original_action_text, current_action_text, msg="Text does not match expected.")
 
         print("Incremental streams tested.")
 

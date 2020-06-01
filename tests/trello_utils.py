@@ -360,12 +360,12 @@ def update_object(obj_type: str, obj_id: str = '', parent_id: str = '', field_to
 
     raise NotImplementedError
 
-def update_object_action(obj_id: str = '', field_to_update: str = 'name'):
+def update_object_action(obj_id: str = ''):  #, field_to_update: str = 'name'):
     """update comment actions"""
     if not obj_id:
         raise Exception("You must specify a comment object action")
-    endpoint = BASE_URL + "/actions/{}/text"
-    data = {"value": get_comment_action(update=True)}
+    endpoint = BASE_URL + "/actions/{}/text".format(obj_id)
+    data = {"value": get_action_comment(update=True)}
     resp = requests.put(url=endpoint, headers=HEADERS, params=PARAMS, json=data)
     if resp.status_code >= 400:
         logging.warn("Request Failed {} \n    {}".format(resp.status_code, resp.text))
