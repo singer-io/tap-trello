@@ -16,7 +16,7 @@ class TrelloBookmarksQA(unittest.TestCase):
     START_DATE = ""
     START_DATE_FORMAT = "%Y-%m-%dT00:00:00Z"
     TEST_TIME_FORMAT = "%Y-%m-%dT%H:%M:%S.%fZ"
-    LOOKBACK_WINODW = 1  # days
+    LOOKBACK_WINDOW = 1  # days
 
     def setUp(self):
         missing_envs = [x for x in [
@@ -98,8 +98,8 @@ class TrelloBookmarksQA(unittest.TestCase):
         }
 
     def get_properties(self):
-        return {  # set to 2 days ago for testing lookback window
-            'start_date' : dt.strftime(dt.utcnow() - timedelta(days=2), self.START_DATE_FORMAT),
+        return {  # set to 3 days ago for testing lookback window
+            'start_date' : dt.strftime(dt.utcnow() - timedelta(days=3), self.START_DATE_FORMAT),
         }
 
     def test_run(self):
@@ -210,10 +210,10 @@ class TrelloBookmarksQA(unittest.TestCase):
         # Get new actions from data manipulation between syncs
         print("Acquriing in-test actions prior to 2nd sync")
         for stream in self.expected_incremental_sync_streams().difference(self.untestable_streams()):
-            # state = dt.strptime(state_1.get('bookmarks').get(stream).get('window_start'), self.TEST_TIME_FORMAT)
-            # since = (state - timedelta(days=self.LOOKBACK_WINDOW)).strftime(self.TEST_TIME_FORMAT)
-            start_date = dt.strptime(self.get_properties().get('start_date'), self.START_DATE_FORMAT)
-            since = start_date.strftime(self.TEST_TIME_FORMAT)
+            state = dt.strptime(state_1.get('bookmarks').get(stream).get('window_start'), self.TEST_TIME_FORMAT)
+            since = (state - timedelta(days=self.LOOKBACK_WINDOW)).strftime(self.TEST_TIME_FORMAT)
+            # start_date = dt.strptime(self.get_properties().get('start_date'), self.START_DATE_FORMAT)
+            # since = start_date.strftime(self.TEST_TIME_FORMAT)
             _, objects = utils.get_total_record_count_and_objects(stream, since=since)
             for obj in objects:
                 expected_records_2[stream].append({field: obj.get(field)
