@@ -111,7 +111,7 @@ def get_objects(obj_type: str, obj_id: str = "", parent_id: str = "", since = No
     if custom_fields:
         if not obj_id:
             raise Exception("Must specify an obj_id to acquire customFields")
-        endpoint += "/customFieldItems"
+        endpoint = BASE_URL + "/{}/{}/customFieldItems".format(obj_type, obj_id)
 
     parameters = PARAMS
     if since:
@@ -164,7 +164,6 @@ def get_random_object_id(obj_type: str, parent_id: str = ""):
     random_object = objects[random.randint(0, len(objects) -1)]
 
     return random_object.get('id')
-
 
 def get_url_string(req: str, obj_type: str, obj_id: str = "", parent_id: str = ""):
     """
@@ -570,14 +569,18 @@ def create_object_lists(obj_type: str='lists', parent_id=''):
 
     raise NotImplementedError
 
-def create_object_cards(obj_type: str = 'cards', parent_id = '', custom = False):
+def create_object_cards(obj_type: str = 'cards', parent_id = '', custom = False, field_type = None):
     print(" * Test Data | Request: POST on /{}/".format(obj_type))
 
     data = stream_to_data_mapping(obj_type)
     if data:
-
         if custom:
-            field, value = get_random_custom_field_and_value(parent_id=parent_id)
+            if field_type:
+                cfield = get_specific_custom_field_value(parent_id=parent_id, field_type=field_type)
+                field = field_type
+                value = cfield
+            else:
+                field, value = get_random_custom_field_and_value(parent_id=parent_id)
             data[field] = value
 
         endpoint = get_url_string("post", obj_type)
@@ -591,9 +594,13 @@ def create_object_cards(obj_type: str = 'cards', parent_id = '', custom = False)
 
     raise NotImplementedError
 
-def create_object(obj_type, obj_id: str = "", parent_id: str = "", action_type = None, custom = False):
+def create_object(obj_type, obj_id: str = "", parent_id: str = "",
+                  action_type = None, custom = False, field_type = None):
     """
     Create a single record for a given object
+    : param action_type: type of aciton to generate, default None will result in board name change
+    : param custom: used for generating an object with a custom field
+    : param field_type: if custom=True pass in
 
     Creates are not available for:
     : actions: we will call update for baords object instea
@@ -613,7 +620,9 @@ def create_object(obj_type, obj_id: str = "", parent_id: str = "", action_type =
         return create_object_boards()
 
     elif obj_type == 'cards':
-        return create_object_cards(parent_id=parent_id, custom=custom)
+        if not custom and field_type:
+            raise Exception("You cannot specify a field type without the custom flag set to true.")
+        return create_object_cards(parent_id=parent_id, custom=custom, field_type=field_type)
 
     elif obj_type == 'lists':
         return create_object_lists(parent_id=parent_id)
@@ -705,24 +714,25 @@ def create_custom_field(obj_type: str = "boards", obj_id : str = "", field_type 
                  "pos": "{}".format(random.randint(1,9999))},
             )
 
-    print(" * Test Data | Creating: {} on {}".format(data.get('name'), obj_type))
+    print(" * Test Data | Creating: {} on board {}".format(data.get('name'), obj_id))
     resp = requests.post(url=endpoint, headers=HEADERS, params=PARAMS, json=data)
     if resp.status_code >= 400:
         logging.warn("Request Failed {} \n    {}".format(resp.status_code, resp.text))
         return None
     return resp.json()
 
-def update_custom_field(obj_type, obj_id, field_id):
+# def assign_custom_field(obj_type, obj_id, field_id, value):
+#     """A field can have up to 50 custom fields"""
 
-    print(" * Test Data | Update: use customField {} on {} {}".format(field_id, obj_type, obj_id))
-    endpoint = BASE_URL + "/{}/{}/customField/{}/item".format(obj_type, obj_id, field_id)
-    resp = requests.put(url=endpoint, headers=HEADERS, params=PARAMS)
+#     print(" * Test Data | Update: use customField {} on {} {}".format(field_id, obj_type, obj_id))
+#     endpoint = BASE_URL + "/{}/{}/customField/{}/{}".format(obj_type, obj_id, field_id, value)
+#     resp = requests.put(url=endpoint, headers=HEADERS, params=PARAMS)
 
-    if resp.status_code >= 400:
-        logging.warn("Request Failed {} \n    {}".format(resp.status_code, resp.text))
-        return None
+#     if resp.status_code >= 400:
+#         logging.warn("Request Failed {} \n    {}".format(resp.status_code, resp.text))
+#         return None
 
-    return resp.json()
+#     return resp.json()
 
 def get_custom_fields(obj_type, obj_id):
     print(" * Test Data | GET: get customFieldItems on {} {}".format(obj_type, obj_id))
@@ -736,29 +746,53 @@ def get_custom_fields(obj_type, obj_id):
 
     return resp.json()
 
-def get_random_custom_field_and_value(obj_type="boards", parent_id=""):
-    global tstamp
-    tstamp = dt.utcnow().timestamp()
+# def get_random_custom_field_and_value(obj_type="boards", parent_id=""):
+#     global tstamp
+#     tstamp = dt.utcnow().timestamp()
 
-    custom_field_data_map = {
-        "checkbox": "checkbox value {}".format(tstamp),
-        "date": "{}".format(dt.strftime(dt.utcnow(), DATE_FORMAT)),
-        "list": [],
-        "number": "{}".format(random.randint(0,9999)),
-        "text": "text value {}".format(tstamp),
-    }
+#     custom_field_data_map = {
+#         "checkbox": "checkbox value {}".format(tstamp),
+#         "date": "{}".format(dt.strftime(dt.utcnow(), DATE_FORMAT)),
+#         "list": [],
+#         "number": "{}".format(random.randint(0,9999)),
+#         "text": "text value {}".format(tstamp),
+#     }
 
-    cfields = get_custom_fields(obj_type, parent_id)
-    if not cfields:
-        raise NotImplementedError("Custom fields have not been created for this board")
+#     cfields = get_custom_fields(obj_type, parent_id)
+#     if not cfields:
+#         raise NotImplementedError("Custom fields have not been created for this board")
 
-    random_cfield = cfields[random.randint(0, len(cfields) -1)]
-    field_type = random_cfield['type']
-    value = custom_field_data_map[field_type]
-    if field_type == 'list':
-        value = random.choice(random_cfield['options'])
+#     random_cfield = cfields[random.randint(0, len(cfields) -1)]
+#     field_type = random_cfield['type']
+#     value = custom_field_data_map[field_type]
+#     if field_type == 'list':
+#         value = random.choice(random_cfield['options'])
 
-    return field_type, value
+#     return field_type, value
+
+# def get_specific_custom_field_value(obj_type="boards", parent_id="", field_type=""):
+#     global tstamp
+#     tstamp = dt.utcnow().timestamp()
+
+#     if not field_type:
+#         raise Exception("You did not pass in a field type.")
+
+#     cfields = get_custom_fields(obj_type, parent_id)
+#     if not cfields:
+#         raise NotImplementedError("This board has no custom fields.")
+
+#     specific_cfields = [field for field in cfields if field.get('type') == field_type]
+#     if not specific_cfields:
+#         print(" * Test Data | Board does not have custom field of type: {} ".format(field_type) +\
+#               " creating one now.")
+#         specific_cfields = list(create_custom_field(obj_id=parent_id, field_type=field_type))
+
+#     chosen_cfield = random.choice(specific_cfields)
+
+#     # if field_type == 'list':
+#     #     return random.choice(chosen_cfield['options'])
+
+#     return chosen_cfield
 
 ##########################################################################
 ### Testing the utils above
