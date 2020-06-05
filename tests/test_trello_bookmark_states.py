@@ -9,7 +9,7 @@ import tap_tester.connections as connections
 import tap_tester.menagerie   as menagerie
 import tap_tester.runner      as runner
 import trello_utils as utils
-import trello_bookmark_states as trello_states
+
 
 class TrelloBookmarkStates(unittest.TestCase):
     START_DATE = ""
