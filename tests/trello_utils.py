@@ -3,7 +3,6 @@
 import os
 import json
 import requests
-# import backoff # TODO add backoff if necessary
 import random
 import logging
 from datetime import timedelta, date
@@ -101,10 +100,34 @@ def get_objects(obj_type: str, obj_id: str = "", parent_id: str = "", since = No
     get all objects for a given object
     -  or -
     get a specific obj by id
-   """
+    """
     if obj_type == 'users': # Dispatch b/c this requires additional logic
         return get_objects_users(obj_id=obj_id, parent_id=parent_id)
+
+    if obj_type == 'cards':
+        return get_objects_cards(obj_id=obj_id, parent_id=parent_id, since=since, custom_fields=custom_fields)
         
+    print(" * Test Data |  Request: GET on /{}/{}".format(obj_type, obj_id))
+
+    endpoint = get_url_string("get", obj_type, obj_id, parent_id)
+    parameters = PARAMS
+    if since:
+        parameters = PARAMS + (('since', since),)
+
+    resp = requests.get(url=endpoint, headers=HEADERS, params=parameters)
+    if resp.status_code >= 400:
+        logging.warn("Request Failed {} \n    {}".format(resp.status_code, resp.text))
+
+        return None
+
+    return resp.json()
+
+def get_objects_cards(obj_type="cards", obj_id: str = "", parent_id: str = "", since = None, custom_fields=False):
+    """
+    get all objects for a given object
+    -  or -
+    get a specific obj by id
+    """
     print(" * Test Data |  Request: GET on /{}/{}".format(obj_type, obj_id))
 
     endpoint = get_url_string("get", obj_type, obj_id, parent_id)
@@ -116,14 +139,32 @@ def get_objects(obj_type: str, obj_id: str = "", parent_id: str = "", since = No
     parameters = PARAMS
     if since:
         parameters = PARAMS + (('since', since),)
+
     resp = requests.get(url=endpoint, headers=HEADERS, params=parameters)
-
     if resp.status_code >= 400:
-       logging.warn("Request Failed {} \n    {}".format(resp.status_code, resp.text))
+        logging.warn("Request Failed {} \n    {}".format(resp.status_code, resp.text))
 
-       return None
+        return None
+    add_to_resp = dict()
+    if custom_fields and len(resp.json()) == 1:
+        value = resp.json()[0].get('value', None)
+        if not value:
+            # more work needed for multiple lists(w/ options) cfields
+            resp_json = resp.json()[0]
+            option_id = resp_json.get('idValue')
+            list_id = resp_json.get('idCustomField')
+
+            endpoint = BASE_URL + '/customFields/{}/options/{}'.format(list_id, option_id)
+            resp_options = requests.get(url=endpoint, headers=HEADERS, params=parameters)
+            if resp_options.status_code >= 400:
+                logging.warn("Request Failed {} \n    {}".format(resp_options.status_code, resp_options.text))
+                return None
+            add_to_resp = {'option': resp_options.json().get('value').get('text')}
+            resp_json.update({'value': add_to_resp})
+            return [resp_json]
 
     return resp.json()
+
 
 def get_random_object_id(obj_type: str, parent_id: str = ""):
     """Return the id of a random object for a specified object_type"""
@@ -670,8 +711,6 @@ def delete_object(obj_type, obj_id: str = "", parent_id: str = ""):
         logging.warn("Request Failed {} \n    {}".format(resp.status_code, resp.text))
         return None
 
-    #trim_parent_objects(obj_id) # we want to track when a PARENT OBJECT has been removed
-    sleep(5)
     return resp.json()
 
 def reset_tracked_parent_objects():  # TODO Reset all tracked data if we end up tracking child streams
@@ -737,7 +776,7 @@ def create_custom_field(obj_type: str = "boards", obj_id : str = "", field_type 
 def get_custom_fields(obj_type, obj_id):
     print(" * Test Data | GET: get customFieldItems on {} {}".format(obj_type, obj_id))
     endpoint = BASE_URL + "/{}/{}/customFields".format(obj_type, obj_id)
-    # parameters = PARAMS + (("customFieldItems", True),)
+
     resp = requests.get(url=endpoint, headers=HEADERS, params=PARAMS)
 
     if resp.status_code >= 400:

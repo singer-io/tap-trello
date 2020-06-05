@@ -173,8 +173,9 @@ class TestTrelloCustomFields(unittest.TestCase):
                     fields_exist[key] = True
                 elif key == 'checked':
                     fields_exist['checkbox'] = True
-                else:  # key is none b/c options on a list do not have a 'value' attribute
+                elif key == 'option':
                     fields_exist['list'] = True
+
         self.assertTrue(all(v for _, v in fields_exist.items()),
                         msg="Not all custom field types have data. Data must be restored manually on Trello account" +\
                         "\nCurrent data: {}".format(fields_exist))
@@ -265,7 +266,6 @@ class TestTrelloCustomFields(unittest.TestCase):
 
                     # Verify the expected custom field attributes match the replicated data
                     for actual_cfields in record_custom_fields:
-                        import pdb; pdb.set_trace()
                         expected_cfield_replicated = expected_cfield in actual_cfields
                         if expected_cfield_replicated:
                             break
