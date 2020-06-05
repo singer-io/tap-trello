@@ -288,7 +288,7 @@ def get_test_data():
             "prefs_background": "blue",  # id of  background or oneof: blue, orange, green, red, purple, pink, lime, sky, grey
             "prefs_cardAging": "regular", # type of card aging on the board (if enabled) One of: pirate, regular. Default: regular
         },
-        "USERS": {"type": ""},  # {"fullName":"xae a12","username":"singersongwriterd42"}
+        "USERS": {"type": ""},  # {"fullName":"xae a12","username":"singersongwriterd42"} # TODO 
         "CARDS": {
             "name":"Card {}".format(tstamp),
             "desc": "This is a description.",

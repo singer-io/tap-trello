@@ -35,10 +35,6 @@ class TrelloBookmarkStates(unittest.TestCase):
         "state_2": {  # State of interrupted sync for Full Table streams
             "window_start": 0, "window_end": 0,"parent_id": TEST_BOARD_ID
         },
-        "state_3": {  # Set window_start = window_end # TODO determine if state has value
-            "parent_id": TEST_BOARD_ID,
-            "window_start": 0, "window_end": 0
-        },
     }
 
     def setUp(self):
@@ -234,7 +230,6 @@ class TrelloBookmarkStates(unittest.TestCase):
         # Grab the empty formatted states to test
         states_to_test = [self.get_states_formatted(i) for i in range(len(self.ACTIONS_STATES))]
 
-        # TODO fix index nums in test and in ACTIONS_STATES above
         ##########################################################################
         ### Testing standard sync state_0
         ##########################################################################
@@ -417,59 +412,6 @@ class TrelloBookmarkStates(unittest.TestCase):
             expected_record_count_2 = len(utils.get_objects(stream, parent_id=last_created_parent_id))
             self.assertEqual(expected_record_count_2, record_count_by_stream_2.get(stream, 0),
                                  msg="Should have less than or equal number of records based on whether we lookback.")
-
-        ##########################################################################
-        ### Testing standard sync state_3
-        ##########################################################################
-        # TODO verify value of this test
-        # version_3 = menagerie.get_state_version(conn_id)
-
-        # # Set parent_id to id of last baord the tap will replicate
-        # states_to_test[3]['bookmarks']['actions']['parent_id'] = last_created_parent_id
-
-        # # Set window_end based off current time
-        # window_end_3 = state_2['bookmarks']['actions']['window_start']
-        # states_to_test[3]['bookmarks']['actions']['window_end'] = window_end_3
-
-        # # Set window_start to window_end
-        # window_start_3 = window_end_3
-        # states_to_test[3]['bookmarks']['actions']['window_start'] = window_start_3
-
-        # print("Interjecting test state:\n{}".format(states_to_test[3]))
-        # menagerie.set_state(conn_id, states_to_test[3], version_3)
-
-        # # Run another sync
-        # print("Running sync job 3")
-        # sync_job_name_3 = runner.run_sync_mode(self, conn_id)
-
-        # #verify tap and target exit codes
-        # exit_status_3 = menagerie.get_exit_status(conn_id, sync_job_name_3)
-        # menagerie.verify_sync_exit_status(self, exit_status_3, sync_job_name_3)
-
-        # # verify data was replicated
-        # record_count_by_stream_3 = runner.examine_target_output_file(
-        #     self, conn_id, self.expected_sync_streams(), self.expected_pks()
-        # )
-        # replicated_row_count_3 =  reduce(lambda accum,c : accum + c, record_count_by_stream_3.values())
-        # self.assertGreater(replicated_row_count_3, 0,
-        #                    msg="failed to replicate any data: {}".format(record_count_by_stream_3))
-        # print("total replicated row count: {}".format(replicated_row_count_3))
-        # synced_records_3 = runner.get_records_from_target_output()
-
-        # # Verify bookmarks were saved as expected inc streams
-        # state_3 = menagerie.get_state(conn_id)
-
-        # # Test cases for state_3
-        # for stream in self.expected_incremental_sync_streams():
-        #     # Verify bookmarks were saved as expected inc streams
-        #     self.assertTrue(state_3.get('bookmarks', {}).get(stream, {}).get('window_start', {}))
-        #     print("Bookmarks meet expectations")
-
-        #     # Verify no data was replicated for incremental streams
-        #     self.assertEqual(
-        #         record_count_by_stream_3.get(stream, 0), 0,
-        #         msg="Expected not to replicate inc streams for state:\n{}".format(states_to_test[3])
-        #     )
 
         ##########################################################################
         ### CLEAN UP

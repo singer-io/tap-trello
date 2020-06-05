@@ -239,6 +239,7 @@ class TestTrelloCustomFields(unittest.TestCase):
                 data = synced_records.get(stream)
                 record_messages = [row['data'] for row in data['messages']]
                 record_ids = [message.get('id') for message in record_messages]
+
                 record_custom_fields = [message.get('customFieldItems')
                                         for message in record_messages if message.get('customFieldItems', None)]
                 record_cfield_ids = []  # [record.get('id') for record in record_custom_fields]
@@ -263,7 +264,12 @@ class TestTrelloCustomFields(unittest.TestCase):
                     )
 
                     # Verify the expected custom field attributes match the replicated data
-                    
+                    for actual_cfields in record_custom_fields:
+                        import pdb; pdb.set_trace()
+                        expected_cfield_replicated = expected_cfield in actual_cfields
+                        if expected_cfield_replicated:
+                            break
+                    self.assertTrue(expected_cfield_replicated)
 
         # Reset the parent objects that we have been tracking
         utils.reset_tracked_parent_objects()
