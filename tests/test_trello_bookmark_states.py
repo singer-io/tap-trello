@@ -22,7 +22,7 @@ class TrelloBookmarkStates(unittest.TestCase):
     Below we define the formatting for the various bookmark states. The actual values
     are set in the test. These states should be considered as different possibilities
     for a given sync NOT as continuations of each other.
-      e.g. sync_2 is a standard sync, sync_0 simulates a killed job in the middle of a sync
+      e.g. sync_0 is a standard sync, sync_1 simulates a killed job in the middle of a sync
     """
     ACTIONS_STATES = {
         "state_0": {  # Final state after standard sync
@@ -140,8 +140,6 @@ class TrelloBookmarkStates(unittest.TestCase):
         return states
 
     def test_run(self):
-        # TODO add "with self.subTest(stream=stream):" to for loops so assertions run for all streams
-
         print("\n\nRUNNING {}\n\n".format(self.name()))
 
         # Initialize start date prior to first sync
@@ -429,7 +427,7 @@ class TrelloBookmarkStates(unittest.TestCase):
 
         # Reset the parent objects that we have been tracking
         utils.reset_tracked_parent_objects()
-        print("---------- TODOs still present. Not all streams are fully tested ----------")
+
 
 if __name__ == '__main__':
     unittest.main()

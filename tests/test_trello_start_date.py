@@ -316,7 +316,6 @@ class TestTrelloStartDate(unittest.TestCase):
 
         # Reset the parent objects that we have been tracking
         utils.reset_tracked_parent_objects()
-        print("\n\n---------- TODOs still present. Not all streams are fully tested ----------\n\n")
 
 
 if __name__ == '__main__':

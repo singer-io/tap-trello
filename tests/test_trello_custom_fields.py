@@ -243,7 +243,7 @@ class TestTrelloCustomFields(unittest.TestCase):
 
                 record_custom_fields = [message.get('customFieldItems')
                                         for message in record_messages if message.get('customFieldItems', None)]
-                record_cfield_ids = []  # [record.get('id') for record in record_custom_fields]
+                record_cfield_ids = []
                 for record in record_custom_fields:
                     for cfield in record:
                         record_cfield_ids.append(cfield.get('id'))
@@ -273,7 +273,6 @@ class TestTrelloCustomFields(unittest.TestCase):
 
         # Reset the parent objects that we have been tracking
         utils.reset_tracked_parent_objects()
-        print("---------- TODOs still present. Not all streams are fully tested ----------")
 
 
 if __name__ == '__main__':

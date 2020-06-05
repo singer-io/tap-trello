@@ -222,10 +222,6 @@ class TestTrelloPagination(unittest.TestCase):
                     self.assertGreater(actual_keys, self.expected_automatic_fields().get(stream),
                                       msg="A paginated synced stream has a record that is missing non-automatic fields.")
 
-                    # TODO Get more specific with this assertion ^ genereate an exact list of expected_keys?
-                    #      This may be unnecessary? If not, see auto fields test for implementation.
-
-
         # Reset the parent objects that we have been tracking
         utils.reset_tracked_parent_objects()
 
