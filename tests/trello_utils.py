@@ -106,13 +106,13 @@ def get_objects(obj_type: str, obj_id: str = "", parent_id: str = "", since = No
 
     if obj_type == 'cards':
         return get_objects_cards(obj_id=obj_id, parent_id=parent_id, since=since, custom_fields=custom_fields)
-        
-    print(" * Test Data |  Request: GET on /{}/{}".format(obj_type, obj_id))
 
     endpoint = get_url_string("get", obj_type, obj_id, parent_id)
     parameters = PARAMS
     if since:
         parameters = PARAMS + (('since', since),)
+
+    print(" * Test Data |  Request: GET on {}, with parameters: {}".format(endpoint, parameters))
 
     resp = requests.get(url=endpoint, headers=HEADERS, params=parameters)
     if resp.status_code >= 400:

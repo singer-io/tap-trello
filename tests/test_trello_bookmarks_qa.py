@@ -323,10 +323,10 @@ class TrelloBookmarksQA(unittest.TestCase):
 
                 # Assert that we are capturing the expected number of records for inc streams
                 # BUG? | TEST ISUUE? | replicating more data than expected
-                # self.assertEqual(record_count_1, len(expected_records_1.get(stream, [])),
-                #                  msg="Stream {} replicated an unexpedted number records on 1st sync.".format(stream))
+                self.assertEqual(record_count_1, len(expected_records_1.get(stream, [])),
+                                 msg="Stream {} replicated an unexpedted number records on 1st sync.".format(stream))
                 self.assertEqual(record_count_2, len(expected_records_2.get(stream, [])),
-                                        msg="Stream {} replicated an unexpedted number records on 2nd sync.".format(stream))
+                                 msg="Stream {} replicated an unexpedted number records on 2nd sync.".format(stream))
 
                 # Assert that we are capturing the expected records for inc streams
                 data_1 = synced_records_1.get(stream, [])
@@ -336,9 +336,6 @@ class TrelloBookmarksQA(unittest.TestCase):
                 for record in expected_records_1.get(stream):
                     self.assertTrue(record.get('id') in record_messages_1,
                                     msg="Missing an expected record from sync 1.")
-                    # self.assertTrue(record.get('id') in record_messages_2, # TODO determine validity
-                    #                 msg="This record does not belong in this sync:" +\
-                    #                 "{}".format(record.get('id')))
                 for record in expected_records_2.get(stream):
                     self.assertTrue(record.get('id') in record_messages_2,
                                     msg="Missing an expected record from sync 2.")
