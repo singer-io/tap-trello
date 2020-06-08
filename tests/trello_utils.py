@@ -112,6 +112,10 @@ def get_objects(obj_type: str, obj_id: str = "", parent_id: str = "", since = No
     if since:
         parameters = PARAMS + (('since', since),)
 
+    if obj_type == 'checklists':
+        parameters += (('fields', 'all'),)
+        parameters += (('checkItem_fields', 'all'),)
+
     print(" * Test Data |  Request: GET on {}, with parameters: {}".format(endpoint, [p for p in parameters if p[0] not in ["key", "token"]]))
 
     resp = requests.get(url=endpoint, headers=HEADERS, params=parameters)
@@ -136,7 +140,7 @@ def get_objects_cards(obj_type="cards", obj_id: str = "", parent_id: str = "", s
             raise Exception("Must specify an obj_id to acquire customFields")
         endpoint = BASE_URL + "/{}/{}/customFieldItems".format(obj_type, obj_id)
 
-    parameters = PARAMS
+    parameters = PARAMS + (('customFieldItems','true'),('limit',20000))
     if since:
         parameters = PARAMS + (('since', since),)
 

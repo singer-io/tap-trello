@@ -275,12 +275,7 @@ class TrelloBookmarksQA(unittest.TestCase):
                 data_2 = synced_records_2.get(stream, [])
                 record_messages_2 = [row.get('data') for row in data_2['messages']]
                 record_ids_2 = set(row.get('data').get('id') for row in data_2['messages'])
-                # WORKAROUND for bug below
-                field_discrepancies = { # missing from: a = actual, e = expected | a is BAD
-                    'checklists': {'limits','creationMethod'},# missing from: e, e
-                    'boards': {'powerUps', 'idTags', 'premiumFeatures'}, # missing from: a, a, a
-                    'cards': {'customFieldItems', 'idMembersVoted'}, # missing from: e, a
-                }
+
                 # verify all expected records are replicated for both syncs
                 self.assertEqual(expected_ids_1, record_ids_1,
                                  msg="Data discrepancy. Expected records do not match actual in sync 1.")
@@ -290,19 +285,8 @@ class TrelloBookmarksQA(unittest.TestCase):
                 for expected_record in expected_records_1.get(stream):
                     actual_record = [message for message in record_messages_1
                                      if message.get('id') == expected_record.get('id')].pop()
-
-                    # BUG | https://stitchdata.atlassian.net/browse/SRCE-3282
-                    # verify all expected fields are replicated for a given record # WORKAROUND
-                    if set(expected_record.keys()) != set(actual_record.keys()):
-                        actual_minus_expected = set(actual_record.keys()).difference(set(expected_record.keys()))
-                        if actual_minus_expected.issubset(field_discrepancies.get(stream)):
-                            print("KNOWN FIELD DISCREPANCY | stream: {} | field(s): {} ".format(stream, actual_minus_expected))
-                        else:
-                            self.assertEqual(set(expected_record.keys()), set(actual_record.keys()),
-                                             msg="Field mismatch between expectations and replicated records in sync 1.")
-                    # verify all expected fields are replicated for a given record # TODO put back when bug addressed
-                    # self.assertEqual(set(expected_record.keys()), set(actual_record.keys()),
-                    #                  msg="Field mismatch between expectations and replicated records in sync 1.")
+                    self.assertEqual(set(expected_record.keys()), set(actual_record.keys()),
+                                     msg="Field mismatch between expectations and replicated records in sync 1.")
 
                 # verify the 2nd sync gets records created after the 1st sync
                 self.assertEqual(set(record_ids_2).difference(set(record_ids_1)),
