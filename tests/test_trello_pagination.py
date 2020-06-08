@@ -99,7 +99,7 @@ class TestTrelloPagination(unittest.TestCase):
         highest_count = 0
 
         for obj in parent_objects:
-            objects = utils.get_objects(obj_type=child_stream, parent_id=obj.get('id'))
+            objects = utils.get_objects(obj_type=child_stream, parent_id=obj.get('id'), since=since)
 
             # Don't return the NEVER DELETE board even if it has the most records, we want to change
             # this baord as LITTLE AS POSSIBLE
@@ -109,8 +109,6 @@ class TestTrelloPagination(unittest.TestCase):
 
         return highest_count, return_object
 
-    # BUG https://stitchdata.atlassian.net/browse/SRCE-3330
-    @unittest.expectedFailure
     def test_run(self):
         """
         Verify that for each stream you can get multiple pages of data
