@@ -109,6 +109,8 @@ class TestTrelloPagination(unittest.TestCase):
 
         return highest_count, return_object
 
+    # BUG https://stitchdata.atlassian.net/browse/SRCE-3330
+    @unittest.expectedFailure
     def test_run(self):
         """
         Verify that for each stream you can get multiple pages of data
