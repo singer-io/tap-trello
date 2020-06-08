@@ -15,6 +15,7 @@ class TestTrelloPagination(unittest.TestCase):
     """Test that we are paginating for streams when exceeding the API record limit of a single query"""
     START_DATE = ""
     START_DATE_FORMAT = "%Y-%m-%dT00:00:00Z"
+    TEST_TIME_FORMAT = "%Y-%m-%dT%H:%M:%S.%fZ"
     API_LIMIT = 1000
 
     def setUp(self):
@@ -91,9 +92,9 @@ class TestTrelloPagination(unittest.TestCase):
             'start_date' : dt.strftime(dt.utcnow() - timedelta(days=5), self.START_DATE_FORMAT),  # set to utc today
         }
 
-    def get_highest_record_count_by_parent_obj_id(self, parent_stream: str, child_stream: str):
+    def get_highest_record_count_by_parent_obj_id(self, parent_stream: str, child_stream: str, since=None):
         """Return the parent object id with the largest record cound for child objects"""
-        parent_record_count, parent_objects = utils.get_total_record_count_and_objects(parent_stream)
+        parent_record_count, parent_objects = utils.get_total_record_count_and_objects(parent_stream, since=since)
         return_object = ""
         highest_count = 0
 
@@ -125,8 +126,10 @@ class TestTrelloPagination(unittest.TestCase):
         final_count = {x: 0 for x in self.expected_sync_streams()}
         for stream in self.testable_streams(): # just actions at the moment
             # Look for parent object with most number of stream records
+            start_date = dt.strptime(self.get_properties().get('start_date'), self.START_DATE_FORMAT)
+            since = start_date.strftime(self.TEST_TIME_FORMAT)
             parent_stream = utils.get_parent_stream(stream)
-            record_count, parent_id = self.get_highest_record_count_by_parent_obj_id(parent_stream, stream)
+            record_count, parent_id = self.get_highest_record_count_by_parent_obj_id(parent_stream, stream, since)
 
             if record_count > 0: # If we do have data already add it to expectations
                 logging.info("Data exists for stream: {}".format(stream))
