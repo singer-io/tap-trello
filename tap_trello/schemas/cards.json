@@ -92,6 +92,18 @@
         }
       }
     },
+    "idMembersVoted": {
+      "type": [
+        "null",
+        "array"
+      ],
+      "items": {
+        "type": [
+          "null",
+          "string"
+        ]
+      }
+    },
     "checkItemStates": {
       "type": [
         "null",
