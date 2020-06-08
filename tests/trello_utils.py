@@ -106,8 +106,6 @@ def get_objects(obj_type: str, obj_id: str = "", parent_id: str = "", since = No
 
     if obj_type == 'cards':
         return get_objects_cards(obj_id=obj_id, parent_id=parent_id, since=since, custom_fields=custom_fields)
-        
-    print(" * Test Data |  Request: GET on /{}/{}".format(obj_type, obj_id))
 
     endpoint = get_url_string("get", obj_type, obj_id, parent_id)
     parameters = PARAMS
@@ -117,6 +115,8 @@ def get_objects(obj_type: str, obj_id: str = "", parent_id: str = "", since = No
     if obj_type == 'checklists':
         parameters += (('fields', 'all'),)
         parameters += (('checkItem_fields', 'all'),)
+
+    print(" * Test Data |  Request: GET on {}, with parameters: {}".format(endpoint, [p for p in parameters if p[0] not in ["key", "token"]]))
 
     resp = requests.get(url=endpoint, headers=HEADERS, params=parameters)
     if resp.status_code >= 400:
