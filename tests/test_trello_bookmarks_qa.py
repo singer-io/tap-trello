@@ -1,5 +1,3 @@
-from time import sleep # TODO remove
-
 import os
 import logging
 import unittest
@@ -137,7 +135,6 @@ class TrelloBookmarksQA(unittest.TestCase):
         action_comments.append(utils.create_object('actions', action_type="comment"))
         for action in action_comments:
             expected_records_1['actions'].append(action)
-        # sleep(10)
         # count_after, after_records = utils.get_total_record_count_and_objects('actions', since=since)
 
 

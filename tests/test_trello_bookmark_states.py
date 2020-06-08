@@ -48,7 +48,7 @@ class TrelloBookmarkStates(unittest.TestCase):
             raise Exception("Missing environment variables: {}".format(missing_envs))
 
     def name(self):
-        return "ta_tester_trello_bookmarks_qa"
+        return "tap_tester_trello_bookmarks_qa"
 
     def get_type(self):
         return "platform.trello"
