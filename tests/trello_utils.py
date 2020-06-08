@@ -112,7 +112,7 @@ def get_objects(obj_type: str, obj_id: str = "", parent_id: str = "", since = No
     if since:
         parameters = PARAMS + (('since', since),)
 
-    print(" * Test Data |  Request: GET on {}, with parameters: {}".format(endpoint, parameters))
+    print(" * Test Data |  Request: GET on {}, with parameters: {}".format(endpoint, [p for p in parameters if p[0] not in ["key", "token"]]))
 
     resp = requests.get(url=endpoint, headers=HEADERS, params=parameters)
     if resp.status_code >= 400:
