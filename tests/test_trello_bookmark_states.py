@@ -360,6 +360,7 @@ class TrelloBookmarkStates(unittest.TestCase):
                         records_penult_window_start.remove(rec)
                         break
 
+            assert record_count_penult_board == len(records_penult_window_start)
             expected_record_count_1 = record_count_penult_board + record_count_last_board
             # expected_records_1 = records_last_board + records_penult_window_start SEE FOR LOOPS
 
@@ -376,15 +377,8 @@ class TrelloBookmarkStates(unittest.TestCase):
                     continue
                 print("MISSING RECORD {}".format(record))
 
-            # import pdb; pdb.set_trace() # UNCOMMENT THIS PDB TO STOP TEST AND LOOK AT MISSING RECORD
-
-            # self.assertEqual(expected_record_count_1, record_count_by_stream_1.get(stream, 0),
-            #                  msg="Sync 1 should only replicate data from the most recently creted board.")
-            # BUG | https://stitchdata.atlassian.net/browse/SRCE-3341  | SHOULD BE ^ but consistently missing 1 record in target
-            # We are missing a comment action record from the actual sync
-            # If this is fixed uncomment the Equal assertion above and remove this assertion below
-            self.assertGreaterEqual(expected_record_count_1, record_count_by_stream_1.get(stream, 0),
-                                    msg="Sync 1 should only replicate data from the most recently creted board.")
+            self.assertEqual(expected_record_count_1, record_count_by_stream_1.get(stream, 0),
+                             msg="Sync 1 should only replicate data from the most recently creted board.")
 
         ##########################################################################
         ### Testing interrupted sync state_2 without date-windowing
