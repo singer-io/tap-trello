@@ -133,7 +133,7 @@ class TestTrelloPagination(unittest.TestCase):
 
             if record_count > 0: # If we do have data already add it to expectations
                 logging.info("Data exists for stream: {}".format(stream))
-                existing_objects = utils.get_objects(obj_type=stream, parent_id=parent_id)
+                existing_objects = utils.get_objects(obj_type=stream, parent_id=parent_id, since=since)
                 assert record_count == len(existing_objects), "TEST ISSUE | referencing wrong parent obj."
                 for obj in existing_objects:
                     expected_records[stream].append(
