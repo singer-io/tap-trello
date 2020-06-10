@@ -5,6 +5,7 @@ import json
 import requests
 import random
 import logging
+import pytz
 from datetime import timedelta, date
 from datetime import datetime as dt
 from time import sleep
@@ -110,6 +111,8 @@ def get_objects(obj_type: str, obj_id: str = "", parent_id: str = "", since = No
     endpoint = get_url_string("get", obj_type, obj_id, parent_id)
     parameters = PARAMS
     if since:
+        if isinstance(since, dt):
+            since = since.replace(tzinfo=pytz.UTC)
         parameters = PARAMS + (('since', since),)
 
     if obj_type == 'checklists':
