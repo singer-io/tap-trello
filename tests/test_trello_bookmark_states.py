@@ -454,8 +454,6 @@ class TrelloBookmarkStates(unittest.TestCase):
         # Reset the parent objects that we have been tracking
         utils.reset_tracked_parent_objects()
 
-        print("\n\n---------- BUG PRESENT | see line 384 ----------\n\n")
-
 
 if __name__ == '__main__':
     unittest.main()
