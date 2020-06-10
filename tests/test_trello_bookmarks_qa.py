@@ -306,7 +306,6 @@ class TrelloBookmarksQA(unittest.TestCase):
                 self.assertGreater(record_count_2, 0)
 
                 # Assert that we are capturing the expected number of records for inc streams
-                # BUG? | TEST ISUUE? | replicating more data than expected
                 self.assertEqual(record_count_1, len(expected_records_1.get(stream, [])),
                                  msg="Stream {} replicated an unexpedted number records on 1st sync.".format(stream))
                 self.assertEqual(record_count_2, len(expected_records_2.get(stream, [])),
