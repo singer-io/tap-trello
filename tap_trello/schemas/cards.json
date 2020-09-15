@@ -10,6 +10,12 @@
         "string"
       ]
     },
+    "start": {
+      "type": [
+        "null",
+        "string"
+      ]
+    },
     "customFieldItems": {
       "type": [
         "null",
