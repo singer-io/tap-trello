@@ -306,7 +306,7 @@ class TrelloBookmarksQA(unittest.TestCase):
                 self.assertGreater(record_count_2, 0)
 
                 # Assert that we are capturing the expected number of records for inc streams
-                self.assertEqual(record_count_1, len(expected_records_1.get(stream, [])),
+                self.assertGreater(record_count_1, len(expected_records_1.get(stream, [])),
                                  msg="Stream {} replicated an unexpedted number records on 1st sync.".format(stream))
                 self.assertEqual(record_count_2, len(expected_records_2.get(stream, [])),
                                  msg="Stream {} replicated an unexpedted number records on 2nd sync.".format(stream))
@@ -322,6 +322,18 @@ class TrelloBookmarksQA(unittest.TestCase):
                 for record in expected_records_2.get(stream):
                     self.assertTrue(record.get('id') in record_messages_2,
                                     msg="Missing an expected record from sync 2.")
+
+                # Assert that the start_date is working
+                first_start_date_str = start_date.strftime('%Y-%m-%dT%H:%M:%SZ')
+                for message in data_1['messages']:
+                    record = message['data']
+                    self.assertLessEqual(first_start_date_str, record['date'])
+
+                second_start_date_str = since
+                for message in data_2['messages']:
+                    record = message['data']
+                    self.assertLessEqual(second_start_date_str, record['date'])
+
 
                 record_data_1 = [row.get('data') for row in data_1['messages']]
                 record_data_2 = [row.get('data') for row in data_2['messages']]
