@@ -282,7 +282,7 @@ class TrelloBookmarksQA(unittest.TestCase):
                 self.assertTrue(expected_ids_1.issubset(record_ids_2),
                                  msg="Data discrepancy. Expected records do not match actual in sync 2.")
 
-                # BUG Skip the next two assertion for the bards
+                # BUG (SRCE-3982) Skip the next assertion for the boards
                 if stream != 'boards':
                     for expected_record in expected_records_1.get(stream):
                         actual_record = [message for message in record_messages_1
@@ -308,8 +308,8 @@ class TrelloBookmarksQA(unittest.TestCase):
                 self.assertGreater(record_count_2, 0)
 
                 # Assert that we are capturing the expected number of records for inc streams
-                self.assertGreater(record_count_1, len(expected_records_1.get(stream, [])),
-                                 msg="Stream {} replicated an unexpedted number records on 1st sync.".format(stream))
+                self.assertGreaterEqual(record_count_1, len(expected_records_1.get(stream, [])),
+                                        msg="Stream {} replicated an unexpedted number records on 1st sync.".format(stream))
                 self.assertEqual(record_count_2, len(expected_records_2.get(stream, [])),
                                  msg="Stream {} replicated an unexpedted number records on 2nd sync.".format(stream))
 
