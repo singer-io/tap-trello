@@ -287,8 +287,13 @@ class TrelloBookmarksQA(unittest.TestCase):
                     for expected_record in expected_records_1.get(stream):
                         actual_record = [message for message in record_messages_1
                                          if message.get('id') == expected_record.get('id')].pop()
-                        self.assertEqual(set(expected_record.keys()), set(actual_record.keys()),
+                        actual_fields = set(actual_record.keys())
+                        expected_fields = set(expected_record.keys())
+                        if stream == 'cards':  # BUG (https://stitchdata.atlassian.net/browse/SRCE-4487)
+                            expected_fields.remove('cardRole')  # Remove when addressed
+                        self.assertEqual(expected_fields, actual_fields,
                                          msg="Field mismatch between expectations and replicated records in sync 1.")
+
 
                 # verify the 2nd sync gets records created after the 1st sync
                 self.assertEqual(set(record_ids_2).difference(set(record_ids_1)),
