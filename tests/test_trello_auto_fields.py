@@ -254,7 +254,7 @@ class TestTrelloAutomaticFields(unittest.TestCase):
 
 
                 # verify by values, that we replicated the expected records
-               for actual_record in actual_records:
+                for actual_record in actual_records:
                     self.assertTrue(actual_record in expected_records.get(stream),
                                     msg="Actual record missing from expectations")
                 if stream != 'actions':  # see NOTE above
