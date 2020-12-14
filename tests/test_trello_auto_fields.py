@@ -255,12 +255,12 @@ class TestTrelloAutomaticFields(unittest.TestCase):
 
                 # verify by values, that we replicated the expected records
                 for actual_record in actual_records:
-                    self.assertTrue(actual_record in expected_records.get(stream),
-                                    msg="Actual record missing from expectations")
-                if stream != 'actions':  # see NOTE above
-                    for expected_record in expected_records.get(stream):
-                        self.assertTrue(expected_record in actual_records,
-                                        msg="Expected record missing from target.")
+                    if stream != 'actions':  # see NOTE above
+                        self.assertTrue(actual_record in expected_records.get(stream),
+                                        msg="Actual record missing from expectations")
+                for expected_record in expected_records.get(stream):
+                    self.assertTrue(expected_record in actual_records,
+                                    msg="Expected record missing from target.")
 
         # CLEAN UP
         stream_to_delete = 'boards'
