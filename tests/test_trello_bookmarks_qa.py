@@ -311,12 +311,17 @@ class TrelloBookmarksQA(unittest.TestCase):
                 # Assert we have data for both syncs for inc streams
                 self.assertGreater(record_count_1, 0)
                 self.assertGreater(record_count_2, 0)
-
                 # Assert that we are capturing the expected number of records for inc streams
                 self.assertGreaterEqual(record_count_1, len(expected_records_1.get(stream, [])),
                                         msg="Stream {} replicated an unexpedted number records on 1st sync.".format(stream))
-                self.assertEqual(record_count_2, len(expected_records_2.get(stream, [])),
-                                 msg="Stream {} replicated an unexpedted number records on 2nd sync.".format(stream))
+                # NOTE: actions seem to be getting updated by trello's backend resulting in an action from a previous
+                #       test run gettting synced again, so we will be less strict for this stream
+                if stream == 'actions':
+                    self.assertGreaterEqual(record_count_2, len(expected_records_2.get(stream, [])),
+                                            msg="Stream {} replicated an unexpedted number records on 2nd sync.".format(stream))
+                else:
+                    self.assertEqual(record_count_2, len(expected_records_2.get(stream, [])),
+                                     msg="Stream {} replicated an unexpedted number records on 2nd sync.".format(stream))
 
                 # Assert that we are capturing the expected records for inc streams
                 data_1 = synced_records_1.get(stream, [])
