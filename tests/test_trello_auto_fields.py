@@ -18,7 +18,6 @@ class TestTrelloAutomaticFields(unittest.TestCase):
     START_DATE = ""
     START_DATE_FORMAT = "%Y-%m-%dT00:00:00Z"
     TEST_TIME_FORMAT = "%Y-%m-%dT%H:%M:%S.%fZ"
-    API_LIMIT = 1000
 
     def setUp(self):
         missing_envs = [x for x in [
@@ -239,9 +238,6 @@ class TestTrelloAutomaticFields(unittest.TestCase):
                 # NOTE: actions seem to be getting updated by trello's backend resulting in an action from a previous
                 #       test run gettting synced again, so we will be less strict for this stream
                 if stream == 'actions':
-                    self.assertGreaterEqual(len(expected_records.get(stream)),
-                                            self.API_LIMIT,
-                                            msg="Number of actual records do not match expectations.")
                     self.assertLessEqual(len(expected_records.get(stream)),
                                          len(actual_records),
                                          msg="Number of actual records do match expectations. " +\
