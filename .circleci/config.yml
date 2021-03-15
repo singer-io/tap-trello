@@ -16,7 +16,7 @@ jobs:
           name: 'JSON Validator'
           command: |
             source /usr/local/share/virtualenvs/tap-tester/bin/activate
-            stitch-validate-json /usr/local/share/virtualenvs/tap-trello/lib/python3.5/site-packages/tap_trello/schemas/*.json
+            stitch-validate-json tap_trello/schemas/*.json
       - run:
           name: 'pylint'
           command: |
