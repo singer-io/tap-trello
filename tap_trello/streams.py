@@ -373,8 +373,52 @@ class Cards(AddCustomFields, ChildStream):
     key_properties = ["id"]
     replication_method = "FULL_TABLE"
     parent_class = Boards
-    MAX_API_RESPONSE_SIZE = 20000
-    params = {'limit': 20000, 'customFieldItems': 'true'}
+    MAX_API_RESPONSE_SIZE = 1000
+    
+    def get_records(self, format_values):
+        # Get max_api_response_size from config and set to paramater
+        response_size = self.config.get('max_api_response_size_card')
+        if response_size and int(response_size):
+            self.MAX_API_RESPONSE_SIZE = int(response_size)
+        self.params = {'limit': self.MAX_API_RESPONSE_SIZE, 'customFieldItems': 'true'}
+
+        # Set window_end with current time
+        window_end = utils.strftime(utils.now())
+
+        custom_fields_map, dropdown_options_map = self.build_custom_fields_maps(parent_id_list=format_values)
+        while True:
+
+            # Get records for cards before specified time or card ID 
+            records = self.client.get(self._format_endpoint(format_values), params={"before": window_end,
+                                                                                    **self.params})
+            for rec in records:
+                yield self.modify_record(rec, parent_id_list = format_values, custom_fields_map = custom_fields_map, dropdown_options_map = dropdown_options_map)
+            
+            # If records are same as limit then shift window to get older data
+            if len(records) == self.MAX_API_RESPONSE_SIZE:
+                LOGGER.info("%s - Collected  %s records for board %s.",
+                            self.stream_id,
+                            len(records),
+                            format_values[0])
+
+                # Sort cards based on card ID as API returns latest records but in unorder manner
+                records = sorted(records, key=lambda x: x['id'])
+                # API returns latest records so set sub_window_end to smallest card id to get older data
+                window_end = records[0]["id"]
+
+            elif self.MAX_API_RESPONSE_SIZE and len(records) > self.MAX_API_RESPONSE_SIZE:
+                raise Exception(
+                    ("{}: Number of records returned is greater than max API response size of {}.").format(
+                        self.stream_id,
+                        self.MAX_API_RESPONSE_SIZE)
+                )
+            else:
+                LOGGER.info("%s - Collected  %s records for board %s.",
+                            self.stream_id,
+                            len(records),
+                            format_values[0])
+                # API returns less records than limit, break the pagination 
+                break
 
 class Checklists(ChildStream):
     stream_id = "checklists"
