@@ -376,7 +376,7 @@ class Cards(AddCustomFields, ChildStream):
     MAX_API_RESPONSE_SIZE = 1000
 
     def get_records(self, format_values, additional_params=None):
-        # Get max_api_response_size from config and set to paramater
+        # Get max_api_response_size from config and set to parameter
         response_size = self.config.get('max_api_response_size_card')
         if response_size and int(response_size):
             self.MAX_API_RESPONSE_SIZE = int(response_size)
@@ -388,7 +388,9 @@ class Cards(AddCustomFields, ChildStream):
         custom_fields_map, dropdown_options_map = self.build_custom_fields_maps(parent_id_list=format_values)
         while True:
 
-            # Get records for cards before specified time or card ID
+            # Get records for cards before specified time or card ID trello we use standard Mongo IDs,
+            # so we can pass Card ID as trello we will derive the date from it.
+            # Reference: https://developer.atlassian.com/cloud/trello/guides/rest-api/api-introduction/#paging
             records = self.client.get(self._format_endpoint(format_values), params={"before": window_end,
                                                                                     **self.params})
             for rec in records:
@@ -403,7 +405,7 @@ class Cards(AddCustomFields, ChildStream):
 
                 # Sort cards based on card ID as API returns latest records but in unorder manner
                 records = sorted(records, key=lambda x: x['id'])
-                # API returns latest records so set sub_window_end to smallest card id to get older data
+                # API returns latest records so set window_end to smallest card id to get older data
                 window_end = records[0]["id"]
 
             elif self.MAX_API_RESPONSE_SIZE and len(records) > self.MAX_API_RESPONSE_SIZE:

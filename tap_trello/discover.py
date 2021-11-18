@@ -17,7 +17,7 @@ def _load_schemas():
     for filename in os.listdir(_get_abs_path("schemas")):
         path = _get_abs_path("schemas") + "/" + filename
         file_raw = filename.replace(".json", "")
-        with open(path, encoding="utf8") as file:
+        with open(path) as file:
             schemas[file_raw] = json.load(file)
 
     return schemas
