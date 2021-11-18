@@ -388,8 +388,8 @@ class Cards(AddCustomFields, ChildStream):
         custom_fields_map, dropdown_options_map = self.build_custom_fields_maps(parent_id_list=format_values)
         while True:
 
-            # Get records for cards before specified time or card ID trello we use standard Mongo IDs,
-            # so we can pass Card ID as trello we will derive the date from it.
+            # Get records for cards before specified time or card ID
+            # Trello use standard Mongo IDs so we can pass Card ID as trello will derive the date from it.
             # Reference: https://developer.atlassian.com/cloud/trello/guides/rest-api/api-introduction/#paging
             records = self.client.get(self._format_endpoint(format_values), params={"before": window_end,
                                                                                     **self.params})
