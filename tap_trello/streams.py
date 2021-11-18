@@ -385,41 +385,41 @@ class Cards(AddCustomFields, ChildStream):
         # Set window_end with current time
         window_end = utils.strftime(utils.now())
 
+        # Build custom fields and dropdown object map for the specific parent
         custom_fields_map, dropdown_options_map = self.build_custom_fields_maps(parent_id_list=format_values)
-        while True:
 
+        while True:
             # Get records for cards before specified time or card ID
             # Trello use standard Mongo IDs so we can pass Card ID as trello will derive the date from it.
             # Reference: https://developer.atlassian.com/cloud/trello/guides/rest-api/api-introduction/#paging
             records = self.client.get(self._format_endpoint(format_values), params={"before": window_end,
-                                                                                    **self.params})
-            for rec in records:
-                yield self.modify_record(rec, parent_id_list = format_values, custom_fields_map = custom_fields_map, dropdown_options_map = dropdown_options_map)
+                                                                                   **self.params})
 
-            # If records are same as limit then shift window to get older data
-            if len(records) == self.MAX_API_RESPONSE_SIZE:
-                LOGGER.info("%s - Collected  %s records for board %s.",
-                            self.stream_id,
-                            len(records),
-                            format_values[0])
-
-                # Sort cards based on card ID as API returns latest records but in unorder manner
-                records = sorted(records, key=lambda x: x['id'])
-                # API returns latest records so set window_end to smallest card id to get older data
-                window_end = records[0]["id"]
-
-            elif self.MAX_API_RESPONSE_SIZE and len(records) > self.MAX_API_RESPONSE_SIZE:
+            # Raise exception if API returns more data than specified limit
+            if self.MAX_API_RESPONSE_SIZE and len(records) > self.MAX_API_RESPONSE_SIZE:
                 raise Exception(
                     ("{}: Number of records returned is greater than max API response size of {}.").format(
                         self.stream_id,
                         self.MAX_API_RESPONSE_SIZE)
                 )
+
+            # Yielding records after adding custom fields and dropdown object map to all records
+            for rec in records:
+                yield self.modify_record(rec, parent_id_list = format_values, custom_fields_map = custom_fields_map, dropdown_options_map = dropdown_options_map)
+
+            LOGGER.info("%s - Collected  %s records for board %s.",
+                        self.stream_id,
+                        len(records),
+                        format_values[0])
+
+            # If records are same as limit then shift window to get older data
+            if len(records) == self.MAX_API_RESPONSE_SIZE:
+                # Sort cards based on card ID as API returns latest records but in unorder manner
+                records = sorted(records, key=lambda x: x['id'])
+                # API returns latest records so set window_end to smallest card id to get older data
+                window_end = records[0]["id"]
             else:
                 # API returns less records than limit, break the pagination
-                LOGGER.info("%s - Collected  %s records for board %s.",
-                            self.stream_id,
-                            len(records),
-                            format_values[0])
                 break
 
 class Checklists(ChildStream):
