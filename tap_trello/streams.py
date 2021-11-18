@@ -373,7 +373,7 @@ class Cards(AddCustomFields, ChildStream):
     key_properties = ["id"]
     replication_method = "FULL_TABLE"
     parent_class = Boards
-    MAX_API_RESPONSE_SIZE = 1000
+    MAX_API_RESPONSE_SIZE = 5000
 
     def get_records(self, format_values, additional_params=None):
         # Get max_api_response_size from config and set to parameter
