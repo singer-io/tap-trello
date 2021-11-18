@@ -374,8 +374,8 @@ class Cards(AddCustomFields, ChildStream):
     replication_method = "FULL_TABLE"
     parent_class = Boards
     MAX_API_RESPONSE_SIZE = 1000
-    
-    def get_records(self, format_values):
+
+    def get_records(self, format_values, additional_params=None):
         # Get max_api_response_size from config and set to paramater
         response_size = self.config.get('max_api_response_size_card')
         if response_size and int(response_size):
@@ -388,12 +388,12 @@ class Cards(AddCustomFields, ChildStream):
         custom_fields_map, dropdown_options_map = self.build_custom_fields_maps(parent_id_list=format_values)
         while True:
 
-            # Get records for cards before specified time or card ID 
+            # Get records for cards before specified time or card ID
             records = self.client.get(self._format_endpoint(format_values), params={"before": window_end,
                                                                                     **self.params})
             for rec in records:
                 yield self.modify_record(rec, parent_id_list = format_values, custom_fields_map = custom_fields_map, dropdown_options_map = dropdown_options_map)
-            
+
             # If records are same as limit then shift window to get older data
             if len(records) == self.MAX_API_RESPONSE_SIZE:
                 LOGGER.info("%s - Collected  %s records for board %s.",
@@ -413,11 +413,11 @@ class Cards(AddCustomFields, ChildStream):
                         self.MAX_API_RESPONSE_SIZE)
                 )
             else:
+                # API returns less records than limit, break the pagination
                 LOGGER.info("%s - Collected  %s records for board %s.",
                             self.stream_id,
                             len(records),
                             format_values[0])
-                # API returns less records than limit, break the pagination 
                 break
 
 class Checklists(ChildStream):

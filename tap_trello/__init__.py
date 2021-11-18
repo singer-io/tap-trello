@@ -3,7 +3,7 @@ from singer import utils
 from singer.catalog import Catalog, write_catalog
 from tap_trello.discover import do_discover
 from tap_trello.sync import do_sync
-import tap_trello.streams as streams
+from tap_trello import streams
 from tap_trello.client import TrelloClient
 
 LOGGER = singer.get_logger()
