@@ -23,24 +23,24 @@ class TestMaxAPIResponseSizeValue(unittest.TestCase):
 
     def test_default_param_value_for_cards(self, mock_request):
         '''
-        Test that when no config value is provided for `max_api_response_size_card`, then default is takn as 1000
+        Test that when no config value is provided for `max_api_response_size_card`, then default is takn as 5000
         '''
         config = {"start_date": "dummy_st","access_token": "dummy_at", "access_token_secret": "dummy_as", "consumer_key": "dummy_ck", "consumer_secret": "dummy_cs"}
         client = TrelloClient(config)
         card = Cards(client, config, {})
         cards = list(card.get_records(['dummy']))
-        self.assertEqual(card.params['limit'], 1000)
+        self.assertEqual(card.params['limit'], 5000)
 
     def test_empty_string_in_config(self, mock_request):
         '''
         Test that when empty string value is provided for the config param `max_api_response_size_card`, the default
-        value is taken and passed as 1000
+        value is taken and passed as 5000
         '''
         config = {"start_date": "dummy_st","access_token": "dummy_at", "access_token_secret": "dummy_as", "consumer_key": "dummy_ck", "consumer_secret": "dummy_cs", "max_api_response_size_card": ""}
         client = TrelloClient(config)
         card = Cards(client, config, {})
         cards = list(card.get_records(['dummy']))
-        self.assertEqual(card.params['limit'], 1000)
+        self.assertEqual(card.params['limit'], 5000)
 
     def test_string_value_in_config(self, mock_request):
         '''
