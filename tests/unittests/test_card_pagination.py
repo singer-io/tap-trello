@@ -6,6 +6,16 @@ from unittest.case import TestCase
 from tap_trello.client import LOGGER, TrelloClient
 from tap_trello.streams import Cards
 
+class MockCatalogEntry:
+    # mock class for is_selected when initializing Cards stream
+    def is_selected(self):
+        return False
+
+class MockCatalog:
+    # mock class for get_stream
+    def get_stream(*args, **kwargs):
+        return MockCatalogEntry()
+
 @mock.patch('tap_trello.client.requests.request')
 class TestMaxAPIResponseSizeValue(unittest.TestCase):
     '''
@@ -17,7 +27,7 @@ class TestMaxAPIResponseSizeValue(unittest.TestCase):
         '''
         config = {"start_date": "dummy_st","access_token": "dummy_at", "access_token_secret": "dummy_as", "consumer_key": "dummy_ck", "consumer_secret": "dummy_cs", "max_api_response_size_card": 200}
         client = TrelloClient(config)
-        card = Cards(client, config, {})
+        card = Cards(client, config, {}, MockCatalog())
         cards = list(card.get_records(['dummy']))
         self.assertEqual(card.params['limit'], 200)
 
@@ -27,7 +37,7 @@ class TestMaxAPIResponseSizeValue(unittest.TestCase):
         '''
         config = {"start_date": "dummy_st","access_token": "dummy_at", "access_token_secret": "dummy_as", "consumer_key": "dummy_ck", "consumer_secret": "dummy_cs"}
         client = TrelloClient(config)
-        card = Cards(client, config, {})
+        card = Cards(client, config, {}, MockCatalog())
         cards = list(card.get_records(['dummy']))
         self.assertEqual(card.params['limit'], 5000)
 
@@ -38,7 +48,7 @@ class TestMaxAPIResponseSizeValue(unittest.TestCase):
         '''
         config = {"start_date": "dummy_st","access_token": "dummy_at", "access_token_secret": "dummy_as", "consumer_key": "dummy_ck", "consumer_secret": "dummy_cs", "max_api_response_size_card": ""}
         client = TrelloClient(config)
-        card = Cards(client, config, {})
+        card = Cards(client, config, {}, MockCatalog())
         cards = list(card.get_records(['dummy']))
         self.assertEqual(card.params['limit'], 5000)
 
@@ -49,7 +59,7 @@ class TestMaxAPIResponseSizeValue(unittest.TestCase):
         '''
         config = {"start_date": "dummy_st","access_token": "dummy_at", "access_token_secret": "dummy_as", "consumer_key": "dummy_ck", "consumer_secret": "dummy_cs", "max_api_response_size_card": "300"}
         client = TrelloClient(config)
-        card = Cards(client, config, {})
+        card = Cards(client, config, {}, MockCatalog())
         cards = list(card.get_records(['dummy']))
         self.assertEqual(card.params['limit'], 300)
 
@@ -95,7 +105,7 @@ class TestCardPagination(unittest.TestCase):
         # config with the `max_api_response_size_card` param set as 2
         config = {"start_date": "dummy_st","access_token": "dummy_at", "access_token_secret": "dummy_as", "consumer_key": "dummy_ck", "consumer_secret": "dummy_cs", "max_api_response_size_card": 2}
         client = TrelloClient(config)
-        card = Cards(client, config, {})
+        card = Cards(client, config, {}, MockCatalog())
         cards = list(card.get_records(['dummy']))
         # a total of 3 records from the first call with 2 records as the `max_api_response_size_card` is set to 2
         # and the second API call with one record indicating the break in the while loop
