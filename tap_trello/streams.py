@@ -2,7 +2,7 @@ from datetime import datetime, timedelta
 from itertools import dropwhile
 import singer
 
-from singer import utils
+from singer import utils, Transformer, metadata
 
 LOGGER = singer.get_logger()
 
@@ -178,10 +178,11 @@ class Stream:
     MAX_API_RESPONSE_SIZE = None
     params = {}
 
-    def __init__(self, client, config, state):
+    def __init__(self, client, config, state, catalog):
         self.client = client
         self.config = config
         self.state = state
+        self.catalog = catalog # initialize catalog for getting metadata and schema
 
 
     def get_format_values(self): # pylint: disable=no-self-use
@@ -299,7 +300,7 @@ class ChildStream(Stream):
 
     def sync(self):
         self.on_window_started()
-        parent = self.parent_class(self.client, self.config, self.state)
+        parent = self.parent_class(self.client, self.config, self.state, self.catalog)
 
         # Get the most recent parent ID and resume from there, if necessary
         bookmarked_parent = singer.get_bookmark(self.state, self.stream_id, 'parent_id')
@@ -375,12 +376,22 @@ class Cards(AddCustomFields, ChildStream):
     parent_class = Boards
     MAX_API_RESPONSE_SIZE = 5000
 
+    def __init__(self, client, config, state, catalog):
+        super().__init__(client, config, state, catalog)
+
+        # check is 'checklists' stream is selected
+        self.is_checklists_selected = self.catalog.get_stream('checklists').is_selected()
+        # if it is selected, then create 'CheckLists' object
+        if self.is_checklists_selected:
+            self.checklists = Checklists(self.client, self.config, self.state, self.catalog)
+
     def get_records(self, format_values, additional_params=None):
         # Get max_api_response_size from config and set to parameter
         response_size = self.config.get('max_api_response_size_card')
         if response_size and int(response_size):
             self.MAX_API_RESPONSE_SIZE = int(response_size)
-        self.params = {'limit': self.MAX_API_RESPONSE_SIZE, 'customFieldItems': 'true'}
+        # add more param, that will return 'checklists' in the cards response
+        self.params = {'limit': self.MAX_API_RESPONSE_SIZE, 'customFieldItems': 'true', 'fields': 'all', 'checklists': 'all'}
 
         # Set window_end with current time
         window_end = utils.strftime(utils.now())
@@ -405,7 +416,11 @@ class Cards(AddCustomFields, ChildStream):
 
             # Yielding records after adding custom fields and dropdown object map to all records
             for rec in records:
-                yield self.modify_record(rec, parent_id_list = format_values, custom_fields_map = custom_fields_map, dropdown_options_map = dropdown_options_map)
+                modified_record = self.modify_record(rec, parent_id_list = format_values, custom_fields_map = custom_fields_map, dropdown_options_map = dropdown_options_map)
+                # if 'checklists' is selected, then write checklists records from 'cards' records
+                if self.is_checklists_selected:
+                    self.checklists.write_checklists_records(modified_record.get('checklists', []))
+                yield modified_record
 
             LOGGER.info("%s - Collected  %s records for board %s.",
                         self.stream_id,
@@ -425,18 +440,28 @@ class Cards(AddCustomFields, ChildStream):
 class Checklists(ChildStream):
     stream_id = "checklists"
     stream_name = "checklists"
-    endpoint = "/boards/{}/checklists"
     key_properties = ["id"]
     replication_method = "FULL_TABLE"
-    parent_class = Boards
-    params = {'fields': 'all', 'checkItem_fields': 'all'}
 
+    # function to write 'checklists' records
+    def write_checklists_records(self, records=[]):
+        # get catalog entry of 'checklists' stream for schema and metadata
+        stream = self.catalog.get_stream(self.stream_id)
+        with Transformer() as transformer:
+            # loop over every record and write record
+            for record in records:
+                singer.write_record(
+                    self.stream_id,
+                    transformer.transform(
+                        record, stream.schema.to_dict(), metadata.to_map(stream.metadata),
+                    )
+                )
 
 STREAM_OBJECTS = {
     'boards': Boards,
     'users': Users,
     'lists': Lists,
     'actions': Actions,
-    'cards': Cards,
-    'checklists': Checklists
+    'checklists': Checklists, # need to write schema of 'checklists' before syncing 'cards'
+    'cards': Cards
 }

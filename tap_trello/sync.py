@@ -14,11 +14,15 @@ def do_sync(client, config, state, catalog):
     #         rec
     #     )
     selected_streams = catalog.get_selected_streams(state)
+    # collect selected streams names
+    selected_stream_names = [x.tap_stream_id for x in selected_streams]
 
-    for stream in selected_streams:
+    # loop over the STREAM_OBJECT and sync if stream is selected
+    for stream_name, stream_obj in STREAM_OBJECTS.items():
+        stream = catalog.get_stream(stream_name)
         stream_id = stream.tap_stream_id
         stream_schema = stream.schema
-        stream_object = STREAM_OBJECTS.get(stream_id)(client, config, state)
+        stream_object = stream_obj(client, config, state, catalog)
 
         if stream_object is None:
             raise Exception("Attempted to sync unknown stream {}".format(stream_id))
@@ -30,13 +34,32 @@ def do_sync(client, config, state, catalog):
             stream_object.replication_keys,
         )
 
-        LOGGER.info("Syncing stream: %s", stream_id)
-
         with Transformer() as transformer:
-            for rec in stream_object.sync():
-                singer.write_record(
-                    stream_id,
-                    transformer.transform(
-                        rec, stream.schema.to_dict(), metadata.to_map(stream.metadata),
-                    )
-                )
+            # 'checklists' will be synced with 'cards' if it is selected
+            if stream_id == 'checklists':
+                continue
+            # as 'checklists' is synced from 'cards', we need to call 'cards' if either 'checklists' or 'cards' are selected
+            elif stream_id == 'cards' and ('cards' in selected_stream_names or 'checklists' in selected_stream_names):
+                if 'cards' in selected_stream_names:
+                    LOGGER.info("Syncing stream: %s", stream_id)
+                # as 'cards' is generator, we need to loop over it to sync 'checklists'
+                for rec in stream_object.sync():
+                    # if 'cards' is selected, then write records
+                    if stream_id in selected_stream_names:
+                        singer.write_record(
+                            stream_id,
+                            transformer.transform(
+                                rec, stream.schema.to_dict(), metadata.to_map(stream.metadata),
+                            )
+                        )
+            else:
+                # if the stream is selected, then sync and write records
+                if stream_id in selected_stream_names:
+                    LOGGER.info("Syncing stream: %s", stream_id)
+                    for rec in stream_object.sync():
+                        singer.write_record(
+                            stream_id,
+                            transformer.transform(
+                                rec, stream.schema.to_dict(), metadata.to_map(stream.metadata),
+                            )
+                        )
