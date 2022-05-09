@@ -379,9 +379,9 @@ class Cards(AddCustomFields, ChildStream):
     def __init__(self, client, config, state, catalog):
         super().__init__(client, config, state, catalog)
 
-        # check is 'checklists' stream is selected
+        # check if 'checklists' stream is selected
         self.is_checklists_selected = self.catalog.get_stream('checklists').is_selected()
-        # if it is selected, then create 'CheckLists' object
+        # if checklists stream is selected, then create the 'CheckLists' object
         if self.is_checklists_selected:
             self.checklists = Checklists(self.client, self.config, self.state, self.catalog)
 
