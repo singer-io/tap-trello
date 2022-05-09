@@ -444,7 +444,7 @@ class Checklists(ChildStream):
     replication_method = "FULL_TABLE"
 
     # function to write 'checklists' records
-    def write_checklists_records(self, records=[]):
+    def write_checklists_records(self, records):
         # get catalog entry of 'checklists' stream for schema and metadata
         stream = self.catalog.get_stream(self.stream_id)
         with Transformer() as transformer:

@@ -39,7 +39,7 @@ def do_sync(client, config, state, catalog):
             if stream_id == 'checklists':
                 continue
             # as 'checklists' is synced from 'cards', we need to call 'cards' if either 'checklists' or 'cards' are selected
-            elif stream_id == 'cards' and ('cards' in selected_stream_names or 'checklists' in selected_stream_names):
+            if stream_id == 'cards' and ('cards' in selected_stream_names or 'checklists' in selected_stream_names):
                 if 'cards' in selected_stream_names:
                     LOGGER.info("Syncing stream: %s", stream_id)
                 # as 'cards' is generator, we need to loop over it to sync 'checklists'
