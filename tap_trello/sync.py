@@ -27,12 +27,13 @@ def do_sync(client, config, state, catalog):
         if stream_object is None:
             raise Exception("Attempted to sync unknown stream {}".format(stream_id))
 
-        singer.write_schema(
-            stream_id,
-            stream_schema.to_dict(),
-            stream_object.key_properties,
-            stream_object.replication_keys,
-        )
+        if stream_name in selected_stream_names:
+            singer.write_schema(
+                stream_id,
+                stream_schema.to_dict(),
+                stream_object.key_properties,
+                stream_object.replication_keys,
+            )
 
         with Transformer() as transformer:
             # 'checklists' will be synced with 'cards' if it is selected
