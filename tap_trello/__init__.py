@@ -15,7 +15,6 @@ def main():
 
     config = args.config  # pylint:disable=unused-variable
     client = TrelloClient(config)  # pylint:disable=unused-variable
-    catalog = args.catalog or Catalog([])
     state = args.state # pylint:disable=unused-variable
 
     if args.properties and not args.catalog:
@@ -26,6 +25,8 @@ def main():
         catalog = do_discover()
         write_catalog(catalog)
     else:
+        # initialize catalog if found in the args, else run discovery mode
+        catalog = args.catalog if args.catalog else do_discover()
         do_sync(client, config, state, catalog)
 
 if __name__ == "__main__":
