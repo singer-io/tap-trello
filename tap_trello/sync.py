@@ -40,8 +40,12 @@ def do_sync(client, config, state, catalog):
                 continue
             # as 'checklists' is synced from 'cards', we need to call 'cards' if either 'checklists' or 'cards' are selected
             if stream_id == 'cards' and ('cards' in selected_stream_names or 'checklists' in selected_stream_names):
-                if 'cards' in selected_stream_names:
-                    LOGGER.info("Syncing stream: %s", stream_id)
+                if 'cards' in selected_stream_names and 'checklists' in selected_stream_names:
+                    LOGGER.info("Syncing stream: cards and checklists")
+                elif 'cards' in selected_stream_names:
+                    LOGGER.info("Syncing stream: cards")
+                elif 'checklists' in selected_stream_names:
+                    LOGGER.info("Syncing stream: checklists")
                 # as 'cards' is generator, we need to loop over it to sync 'checklists'
                 for rec in stream_object.sync():
                     # if 'cards' is selected, then write records
