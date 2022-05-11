@@ -40,7 +40,7 @@ class TestTrelloPagination(unittest.TestCase):
             'consumer_secret': os.getenv('TAP_TRELLO_CONSUMER_SECRET'),
             'access_token': os.getenv('TAP_TRELLO_ACCESS_TOKEN'),
             'access_token_secret': os.getenv('TAP_TRELLO_ACCESS_TOKEN_SECRET'),
-            'max_api_response_size_card': 50 # Configurable pagination limit for card stream
+            'max_api_response_size_card': '50' # Configurable pagination limit for card stream
         }
 
     def testable_streams(self):
