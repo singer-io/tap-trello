@@ -20,9 +20,9 @@ class OrderChecker:
         Actions, this ensures that this holds up.
         """
         if self.order == 'ASC':
-            check_paired_order = lambda a, b: a < b
+            check_paired_order = lambda a, b: a < b # pylint: unnecessary-lambda-assignment
         else:
-            check_paired_order = lambda a, b: a > b
+            check_paired_order = lambda a, b: a > b # pylint: unnecessary-lambda-assignment
 
         if self._last_value is None:
             self._last_value = current_value
@@ -186,16 +186,16 @@ class Stream:
         self.catalog = catalog # initialize catalog for getting metadata and schema
 
 
-    def get_format_values(self): # pylint: disable=no-self-use
+    def get_format_values(self):
         return []
 
     def _format_endpoint(self, format_values):
         return self.endpoint.format(*format_values)
 
-    def modify_record(self, record, **kwargs): # pylint: disable=no-self-use,unused-argument
+    def modify_record(self, record, **kwargs): # pylint: unused-argument
         return record
 
-    def build_custom_fields_maps(self, **kwargs): # pylint: disable=no-self-use,unused-argument
+    def build_custom_fields_maps(self, **kwargs): # pylint: unused-argument
         return {}, {}
 
     def get_records(self, format_values, additional_params=None):
@@ -230,7 +230,7 @@ class Stream:
             yield rec
 
 class AddCustomFields(Mixin):
-    def _get_dropdown_option_key(self, field_id, option_id): # pylint: disable=no-self-use
+    def _get_dropdown_option_key(self, field_id, option_id):
         return field_id + '_' + option_id
 
     def build_custom_fields_maps(self, **kwargs):
@@ -251,7 +251,7 @@ class AddCustomFields(Mixin):
         return custom_fields_map, dropdown_options_map
 
 
-    def modify_record(self, record, **kwargs): # pylint: disable=no-self-use
+    def modify_record(self, record, **kwargs):
         custom_fields_map = kwargs['custom_fields_map']
         dropdown_options_map = kwargs['dropdown_options_map']
         for custom_field in record['customFieldItems']:
@@ -265,7 +265,7 @@ class AddCustomFields(Mixin):
 
 
 class AddBoardId(Mixin):
-    def modify_record(self, record, **kwargs): # pylint: disable=no-self-use
+    def modify_record(self, record, **kwargs):
         boardIdList = kwargs['parent_id_list']
         assert len(boardIdList) == 1
         record["boardId"] = boardIdList[0]
@@ -284,7 +284,7 @@ class ChildStream(Stream):
         for parent_obj in parent.get_records(parent.get_format_values(), additional_params={"fields": "id"}):
             yield parent_obj['id']
 
-    def _sort_parent_ids_by_created(self, parent_ids): # pylint: disable=no-self-use
+    def _sort_parent_ids_by_created(self, parent_ids):
         # NB This is documented here. Yes it's hacky
         # - https://help.trello.com/article/759-getting-the-time-a-card-or-board-was-created
         parents = [{"id": x, "created": datetime.utcfromtimestamp(int(x[:8], 16))}
