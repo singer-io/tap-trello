@@ -177,6 +177,7 @@ class Stream:
     _last_bookmark_value = None
     MAX_API_RESPONSE_SIZE = None
     params = {}
+    unsupported_fields = []
 
     def __init__(self, client, config, state, catalog):
         self.client = client
@@ -442,6 +443,7 @@ class Checklists(ChildStream):
     stream_name = "checklists"
     key_properties = ["id"]
     replication_method = "FULL_TABLE"
+    unsupported_fields = ["limits", "creationMethod"]
 
     # function to write 'checklists' records
     def write_checklists_records(self, records):
