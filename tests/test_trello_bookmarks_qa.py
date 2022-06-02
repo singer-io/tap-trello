@@ -291,6 +291,12 @@ class TrelloBookmarksQA(unittest.TestCase):
                         expected_fields = set(expected_record.keys())
                         if stream == 'cards':  # BUG (https://stitchdata.atlassian.net/browse/SRCE-4487)
                             expected_fields.remove('cardRole')  # Remove when addressed
+                        elif stream == 'checklists':
+                            # NOTE: We updated the endpoint for checklists stream
+                            # as a result we will not replicate this 2 fields
+                            #   Please refere card: https://jira.talendforge.org/browse/TDL-18878 for more details
+                            expected_fields.remove('limits')
+                            expected_fields.remove('creationMethod')
                         self.assertEqual(expected_fields, actual_fields,
                                          msg="Field mismatch between expectations and replicated records in sync 1.")
 

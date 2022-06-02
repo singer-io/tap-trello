@@ -40,7 +40,7 @@ def do_discover():
         for field_name in stream.replication_keys:
             metadata.write(mdata, ('properties', field_name), 'inclusion', 'automatic')
 
-        # mark unsupported stream as 'unsupported' in the metadata
+        # mark unsupported fields as 'unsupported' in the metadata
         for field_name in stream.unsupported_fields:
             metadata.write(mdata, ('properties', field_name), 'inclusion', 'unsupported')
 
