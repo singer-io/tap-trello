@@ -20,9 +20,9 @@ class OrderChecker:
         Actions, this ensures that this holds up.
         """
         if self.order == 'ASC':
-            check_paired_order = lambda a, b: a < b # pylint: unnecessary-lambda-assignment
+            check_paired_order = lambda a, b: a < b # pylint: disable=unnecessary-lambda-assignment
         else:
-            check_paired_order = lambda a, b: a > b # pylint: unnecessary-lambda-assignment
+            check_paired_order = lambda a, b: a > b # pylint: disable=unnecessary-lambda-assignment
 
         if self._last_value is None:
             self._last_value = current_value
@@ -192,10 +192,10 @@ class Stream:
     def _format_endpoint(self, format_values):
         return self.endpoint.format(*format_values)
 
-    def modify_record(self, record, **kwargs): # pylint: unused-argument
+    def modify_record(self, record, **kwargs): # pylint: diasbale=unused-argument
         return record
 
-    def build_custom_fields_maps(self, **kwargs): # pylint: unused-argument
+    def build_custom_fields_maps(self, **kwargs): # pylint: diasbale=unused-argument
         return {}, {}
 
     def get_records(self, format_values, additional_params=None):
