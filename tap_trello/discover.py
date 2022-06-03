@@ -43,6 +43,8 @@ def do_discover():
         # mark unsupported fields as 'unsupported' in the metadata
         for field_name in stream.unsupported_fields:
             metadata.write(mdata, ('properties', field_name), 'inclusion', 'unsupported')
+            metadata.write(mdata, ('properties', field_name), 'unsupported-description', \
+                'This field is not returned by the updated API endpoint.')
 
         catalog_entry = {
             "stream": stream_name,
