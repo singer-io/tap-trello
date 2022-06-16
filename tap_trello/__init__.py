@@ -3,7 +3,7 @@ from singer import utils
 from singer.catalog import Catalog, write_catalog
 from tap_trello.discover import do_discover
 from tap_trello.sync import do_sync
-import tap_trello.streams as streams
+from tap_trello import streams
 from tap_trello.client import TrelloClient
 
 LOGGER = singer.get_logger()
@@ -15,7 +15,6 @@ def main():
 
     config = args.config  # pylint:disable=unused-variable
     client = TrelloClient(config)  # pylint:disable=unused-variable
-    catalog = args.catalog or Catalog([])
     state = args.state # pylint:disable=unused-variable
 
     if args.properties and not args.catalog:
@@ -26,6 +25,8 @@ def main():
         catalog = do_discover()
         write_catalog(catalog)
     else:
+        # initialize catalog if found in the args, else run discovery mode
+        catalog = args.catalog if args.catalog else do_discover()
         do_sync(client, config, state, catalog)
 
 if __name__ == "__main__":

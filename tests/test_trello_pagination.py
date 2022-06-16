@@ -40,6 +40,7 @@ class TestTrelloPagination(unittest.TestCase):
             'consumer_secret': os.getenv('TAP_TRELLO_CONSUMER_SECRET'),
             'access_token': os.getenv('TAP_TRELLO_ACCESS_TOKEN'),
             'access_token_secret': os.getenv('TAP_TRELLO_ACCESS_TOKEN_SECRET'),
+            'max_api_response_size_card': '50' # Configurable pagination limit for card stream
         }
 
     def testable_streams(self):
@@ -49,6 +50,7 @@ class TestTrelloPagination(unittest.TestCase):
         """
         return {
             'actions',
+            'cards'
         }
 
     def expected_check_streams(self):
@@ -114,6 +116,8 @@ class TestTrelloPagination(unittest.TestCase):
         Verify that for each stream you can get multiple pages of data
         when no fields are selected and only the automatic fields are replicated.
 
+        Verify by pks that the data replicated matches the data we expect.
+
         PREREQUISITE
         For EACH stream add enough data that you surpass the limit of a single
         fetch of data.  For instance if you have a limit of 250 records ensure
@@ -125,9 +129,11 @@ class TestTrelloPagination(unittest.TestCase):
         expected_records = {x: [] for x in self.expected_sync_streams()} # ids by stream
         final_count = {x: 0 for x in self.expected_sync_streams()}
         for stream in self.testable_streams(): # just actions at the moment
+            self.API_LIMIT = 50 if stream == "cards" else 1000 # Page limit for card stream(50) is configured in config above
             # Look for parent object with most number of stream records
             start_date = dt.strptime(self.get_properties().get('start_date'), self.START_DATE_FORMAT)
-            since = start_date.strftime(self.TEST_TIME_FORMAT)
+            # Card is full_table stream so no need to check that data available since start_date or not
+            since = start_date.strftime(self.TEST_TIME_FORMAT) if stream =="actions" else None
             parent_stream = utils.get_parent_stream(stream)
             record_count, parent_id = self.get_highest_record_count_by_parent_obj_id(parent_stream, stream, since)
 
@@ -206,6 +212,12 @@ class TestTrelloPagination(unittest.TestCase):
 
         for stream in self.testable_streams():
             with self.subTest(stream=stream):
+        
+                # Page limit for card stream(50) is configured in config above
+                self.API_LIMIT = 50 if stream == "cards" else 1000
+
+                # expected values
+                expected_primary_keys = self.expected_pks()[stream]
 
                 # Verify we are paginating for testable synced streams
                 self.assertGreater(record_count_by_stream.get(stream, -1), self.API_LIMIT,
@@ -224,6 +236,20 @@ class TestTrelloPagination(unittest.TestCase):
                     # SKIP THIS ASSERTION IF ALL FIELDS ARE INTENTIONALLY AUTOMATIC FOR THIS STREAM
                     self.assertGreater(actual_keys, self.expected_automatic_fields().get(stream),
                                       msg="A paginated synced stream has a record that is missing non-automatic fields.")
+
+                primary_keys_list = [tuple([message.get('data').get(expected_pk) for expected_pk in expected_primary_keys])
+                                    for message in synced_records.get(stream).get('messages')
+                                    if message.get('action') == 'upsert']
+
+                primary_keys_list_1 = primary_keys_list[:self.API_LIMIT]
+                primary_keys_list_2 = primary_keys_list[self.API_LIMIT:2*self.API_LIMIT]
+
+                primary_keys_page_1 = set(primary_keys_list_1)
+                primary_keys_page_2 = set(primary_keys_list_2)
+
+                # Verify by primary keys that data is unique for page
+                self.assertTrue(
+                    primary_keys_page_1.isdisjoint(primary_keys_page_2))
 
         # Reset the parent objects that we have been tracking
         utils.reset_tracked_parent_objects()

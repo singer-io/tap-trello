@@ -2,7 +2,7 @@ from datetime import datetime, timedelta
 from itertools import dropwhile
 import singer
 
-from singer import utils
+from singer import utils, Transformer, metadata
 
 LOGGER = singer.get_logger()
 
@@ -20,9 +20,9 @@ class OrderChecker:
         Actions, this ensures that this holds up.
         """
         if self.order == 'ASC':
-            check_paired_order = lambda a, b: a < b
+            check_paired_order = lambda a, b: a < b # pylint: disable=unnecessary-lambda-assignment
         else:
-            check_paired_order = lambda a, b: a > b
+            check_paired_order = lambda a, b: a > b # pylint: disable=unnecessary-lambda-assignment
 
         if self._last_value is None:
             self._last_value = current_value
@@ -177,23 +177,25 @@ class Stream:
     _last_bookmark_value = None
     MAX_API_RESPONSE_SIZE = None
     params = {}
+    unsupported_fields = []
 
-    def __init__(self, client, config, state):
+    def __init__(self, client, config, state, catalog):
         self.client = client
         self.config = config
         self.state = state
+        self.catalog = catalog # initialize catalog for getting metadata and schema
 
 
-    def get_format_values(self): # pylint: disable=no-self-use
+    def get_format_values(self):
         return []
 
     def _format_endpoint(self, format_values):
         return self.endpoint.format(*format_values)
 
-    def modify_record(self, record, **kwargs): # pylint: disable=no-self-use,unused-argument
+    def modify_record(self, record, **kwargs): # pylint: disable=unused-argument
         return record
 
-    def build_custom_fields_maps(self, **kwargs): # pylint: disable=no-self-use,unused-argument
+    def build_custom_fields_maps(self, **kwargs): # pylint: disable=unused-argument
         return {}, {}
 
     def get_records(self, format_values, additional_params=None):
@@ -228,7 +230,7 @@ class Stream:
             yield rec
 
 class AddCustomFields(Mixin):
-    def _get_dropdown_option_key(self, field_id, option_id): # pylint: disable=no-self-use
+    def _get_dropdown_option_key(self, field_id, option_id):
         return field_id + '_' + option_id
 
     def build_custom_fields_maps(self, **kwargs):
@@ -249,7 +251,7 @@ class AddCustomFields(Mixin):
         return custom_fields_map, dropdown_options_map
 
 
-    def modify_record(self, record, **kwargs): # pylint: disable=no-self-use
+    def modify_record(self, record, **kwargs):
         custom_fields_map = kwargs['custom_fields_map']
         dropdown_options_map = kwargs['dropdown_options_map']
         for custom_field in record['customFieldItems']:
@@ -263,7 +265,7 @@ class AddCustomFields(Mixin):
 
 
 class AddBoardId(Mixin):
-    def modify_record(self, record, **kwargs): # pylint: disable=no-self-use
+    def modify_record(self, record, **kwargs):
         boardIdList = kwargs['parent_id_list']
         assert len(boardIdList) == 1
         record["boardId"] = boardIdList[0]
@@ -282,7 +284,7 @@ class ChildStream(Stream):
         for parent_obj in parent.get_records(parent.get_format_values(), additional_params={"fields": "id"}):
             yield parent_obj['id']
 
-    def _sort_parent_ids_by_created(self, parent_ids): # pylint: disable=no-self-use
+    def _sort_parent_ids_by_created(self, parent_ids):
         # NB This is documented here. Yes it's hacky
         # - https://help.trello.com/article/759-getting-the-time-a-card-or-board-was-created
         parents = [{"id": x, "created": datetime.utcfromtimestamp(int(x[:8], 16))}
@@ -299,7 +301,7 @@ class ChildStream(Stream):
 
     def sync(self):
         self.on_window_started()
-        parent = self.parent_class(self.client, self.config, self.state)
+        parent = self.parent_class(self.client, self.config, self.state, self.catalog)
 
         # Get the most recent parent ID and resume from there, if necessary
         bookmarked_parent = singer.get_bookmark(self.state, self.stream_id, 'parent_id')
@@ -373,24 +375,95 @@ class Cards(AddCustomFields, ChildStream):
     key_properties = ["id"]
     replication_method = "FULL_TABLE"
     parent_class = Boards
-    MAX_API_RESPONSE_SIZE = 20000
-    params = {'limit': 20000, 'customFieldItems': 'true'}
+    MAX_API_RESPONSE_SIZE = 5000
+
+    def __init__(self, client, config, state, catalog):
+        super().__init__(client, config, state, catalog)
+
+        # check if 'checklists' stream is selected
+        self.is_checklists_selected = self.catalog.get_stream('checklists').is_selected()
+        # if checklists stream is selected, then create the 'CheckLists' object
+        if self.is_checklists_selected:
+            self.checklists = Checklists(self.client, self.config, self.state, self.catalog)
+
+    def get_records(self, format_values, additional_params=None):
+        # Get max_api_response_size from config and set to parameter
+        response_size = self.config.get('max_api_response_size_card')
+        if response_size and int(response_size):
+            self.MAX_API_RESPONSE_SIZE = int(response_size)
+        # add more param, that will return 'checklists' in the cards response
+        self.params = {'limit': self.MAX_API_RESPONSE_SIZE, 'customFieldItems': 'true', 'fields': 'all', 'checklists': 'all'}
+
+        # Set window_end with current time
+        window_end = utils.strftime(utils.now())
+
+        # Build custom fields and dropdown object map for the specific parent
+        custom_fields_map, dropdown_options_map = self.build_custom_fields_maps(parent_id_list=format_values)
+
+        while True:
+            # Get records for cards before specified time or card ID
+            # Trello use standard Mongo IDs so we can pass Card ID as trello will derive the date from it.
+            # Reference: https://developer.atlassian.com/cloud/trello/guides/rest-api/api-introduction/#paging
+            records = self.client.get(self._format_endpoint(format_values), params={"before": window_end,
+                                                                                   **self.params})
+
+            # Raise exception if API returns more data than specified limit
+            if self.MAX_API_RESPONSE_SIZE and len(records) > self.MAX_API_RESPONSE_SIZE:
+                raise Exception(
+                    ("{}: Number of records returned is greater than max API response size of {}.").format(
+                        self.stream_id,
+                        self.MAX_API_RESPONSE_SIZE)
+                )
+
+            # Yielding records after adding custom fields and dropdown object map to all records
+            for rec in records:
+                modified_record = self.modify_record(rec, parent_id_list = format_values, custom_fields_map = custom_fields_map, dropdown_options_map = dropdown_options_map)
+                # if 'checklists' is selected, then write checklists records from 'cards' records
+                if self.is_checklists_selected:
+                    self.checklists.write_checklists_records(modified_record.get('checklists', []))
+                yield modified_record
+
+            LOGGER.info("%s - Collected  %s records for board %s.",
+                        self.stream_id,
+                        len(records),
+                        format_values[0])
+
+            # If records are same as limit then shift window to get older data
+            if len(records) == self.MAX_API_RESPONSE_SIZE:
+                # Sort cards based on card ID as API returns latest records but in unorder manner
+                records = sorted(records, key=lambda x: x['id'])
+                # API returns latest records so set window_end to smallest card id to get older data
+                window_end = records[0]["id"]
+            else:
+                # API returns less records than limit, break the pagination
+                break
 
 class Checklists(ChildStream):
     stream_id = "checklists"
     stream_name = "checklists"
-    endpoint = "/boards/{}/checklists"
     key_properties = ["id"]
     replication_method = "FULL_TABLE"
-    parent_class = Boards
-    params = {'fields': 'all', 'checkItem_fields': 'all'}
+    unsupported_fields = ["limits", "creationMethod"]
 
+    # function to write 'checklists' records
+    def write_checklists_records(self, records):
+        # get catalog entry of 'checklists' stream for schema and metadata
+        stream = self.catalog.get_stream(self.stream_id)
+        with Transformer() as transformer:
+            # loop over every record and write record
+            for record in records:
+                singer.write_record(
+                    self.stream_id,
+                    transformer.transform(
+                        record, stream.schema.to_dict(), metadata.to_map(stream.metadata),
+                    )
+                )
 
 STREAM_OBJECTS = {
     'boards': Boards,
     'users': Users,
     'lists': Lists,
     'actions': Actions,
-    'cards': Cards,
-    'checklists': Checklists
+    'checklists': Checklists, # need to write schema of 'checklists' before syncing 'cards'
+    'cards': Cards
 }
