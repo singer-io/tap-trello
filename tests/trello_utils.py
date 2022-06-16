@@ -30,6 +30,20 @@ MAX_API_LIMIT = 1000 # this is the smallest
 #     'lists': None,
 #     'users': None
 # }
+PRIMARY_KEY = {
+    'actions' : {"id"},
+    'boards' : {"id"},
+    'cards' : {"id"},
+    'checklists': {"id"},
+    'lists' : {"id"},
+    'users' : {"id", "boardId"}
+}
+REPLICATION_KEYS = {
+    'actions': {"date"}
+}
+UNSUPPORTED_FIELDS  = {
+    'checklists': {'creationMethod', 'limits'}
+}
 REPLICATION_METHOD = {
     'actions': 'INCREMENTAL',
     'boards': 'FULL_TABLE',
@@ -58,6 +72,16 @@ PARAMS = (
 ##########################################################################
 ### Utils for retrieving existing test data 
 ##########################################################################
+
+def get_primary_keys(stream):
+    return PRIMARY_KEY.get(stream)
+
+def get_replication_keys(stream):
+    return REPLICATION_KEYS.get(stream, set())
+
+def get_unsupported_fields(stream):
+    return UNSUPPORTED_FIELDS.get(stream, set())
+
 def get_replication_method(stream):
     if stream in REPLICATION_METHOD.keys():
         return REPLICATION_METHOD.get(stream)
