@@ -13,9 +13,9 @@ class TestMaxAPIResponseSizeValue(unittest.TestCase):
     '''
     def test_param_value_from_config_for_cards(self, mock_request):
         '''
-        Test that when config parameter `max_api_response_size_card` is passed the params is set correctly from the config value
+        Test that when config parameter `cards_response_size` is passed the params is set correctly from the config value
         '''
-        config = {"start_date": "dummy_st","access_token": "dummy_at", "access_token_secret": "dummy_as", "consumer_key": "dummy_ck", "consumer_secret": "dummy_cs", "max_api_response_size_card": 200}
+        config = {"start_date": "dummy_st","access_token": "dummy_at", "access_token_secret": "dummy_as", "consumer_key": "dummy_ck", "consumer_secret": "dummy_cs", "cards_response_size": 200}
         client = TrelloClient(config)
         card = Cards(client, config, {})
         cards = list(card.get_records(['dummy']))
@@ -23,31 +23,31 @@ class TestMaxAPIResponseSizeValue(unittest.TestCase):
 
     def test_default_param_value_for_cards(self, mock_request):
         '''
-        Test that when no config value is provided for `max_api_response_size_card`, then default is takn as 5000
+        Test that when no config value is provided for `cards_response_size`, then default is taken as 1000
         '''
         config = {"start_date": "dummy_st","access_token": "dummy_at", "access_token_secret": "dummy_as", "consumer_key": "dummy_ck", "consumer_secret": "dummy_cs"}
         client = TrelloClient(config)
         card = Cards(client, config, {})
         cards = list(card.get_records(['dummy']))
-        self.assertEqual(card.params['limit'], 5000)
+        self.assertEqual(card.params['limit'], 1000)
 
     def test_empty_string_in_config(self, mock_request):
         '''
-        Test that when empty string value is provided for the config param `max_api_response_size_card`, the default
+        Test that when empty string value is provided for the config param `cards_response_size`, the default
         value is taken and passed as 5000
         '''
-        config = {"start_date": "dummy_st","access_token": "dummy_at", "access_token_secret": "dummy_as", "consumer_key": "dummy_ck", "consumer_secret": "dummy_cs", "max_api_response_size_card": ""}
+        config = {"start_date": "dummy_st","access_token": "dummy_at", "access_token_secret": "dummy_as", "consumer_key": "dummy_ck", "consumer_secret": "dummy_cs", "cards_response_size": ""}
         client = TrelloClient(config)
         card = Cards(client, config, {})
         cards = list(card.get_records(['dummy']))
-        self.assertEqual(card.params['limit'], 5000)
+        self.assertEqual(card.params['limit'], 1000)
 
     def test_string_value_in_config(self, mock_request):
         '''
-        Test that when a string value is passe in the config param `max_api_response_size_card`, it is converted to integer
+        Test that when a string value is passe in the config param `cards_response_size`, it is converted to integer
         and then passed
         '''
-        config = {"start_date": "dummy_st","access_token": "dummy_at", "access_token_secret": "dummy_as", "consumer_key": "dummy_ck", "consumer_secret": "dummy_cs", "max_api_response_size_card": "300"}
+        config = {"start_date": "dummy_st","access_token": "dummy_at", "access_token_secret": "dummy_as", "consumer_key": "dummy_ck", "consumer_secret": "dummy_cs", "cards_response_size": "300"}
         client = TrelloClient(config)
         card = Cards(client, config, {})
         cards = list(card.get_records(['dummy']))
@@ -92,11 +92,11 @@ class TestCardPagination(unittest.TestCase):
         '''
         mock_custom_fields.side_effect = mock_build_custom_fields
         mock_modify_record.side_effect = mock_modify_rec
-        # config with the `max_api_response_size_card` param set as 2
-        config = {"start_date": "dummy_st","access_token": "dummy_at", "access_token_secret": "dummy_as", "consumer_key": "dummy_ck", "consumer_secret": "dummy_cs", "max_api_response_size_card": 2}
+        # config with the `cards_response_size` param set as 2
+        config = {"start_date": "dummy_st","access_token": "dummy_at", "access_token_secret": "dummy_as", "consumer_key": "dummy_ck", "consumer_secret": "dummy_cs", "cards_response_size": 2}
         client = TrelloClient(config)
         card = Cards(client, config, {})
         cards = list(card.get_records(['dummy']))
-        # a total of 3 records from the first call with 2 records as the `max_api_response_size_card` is set to 2
+        # a total of 3 records from the first call with 2 records as the `cards_response_size` is set to 2
         # and the second API call with one record indicating the break in the while loop
         self.assertEqual(len(cards), 3)
