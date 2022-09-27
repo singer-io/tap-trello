@@ -184,16 +184,16 @@ class Stream:
         self.state = state
 
 
-    def get_format_values(self): # pylint: disable=no-self-use
+    def get_format_values(self):
         return []
 
     def _format_endpoint(self, format_values):
         return self.endpoint.format(*format_values)
 
-    def modify_record(self, record, **kwargs): # pylint: disable=no-self-use,unused-argument
+    def modify_record(self, record, **kwargs): # pylint: disable=unused-argument
         return record
 
-    def build_custom_fields_maps(self, **kwargs): # pylint: disable=no-self-use,unused-argument
+    def build_custom_fields_maps(self, **kwargs): # pylint: disable=unused-argument
         return {}, {}
 
     def get_records(self, format_values, additional_params=None):
