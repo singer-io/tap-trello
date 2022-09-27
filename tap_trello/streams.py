@@ -373,13 +373,12 @@ class Cards(AddCustomFields, ChildStream):
     key_properties = ["id"]
     replication_method = "FULL_TABLE"
     parent_class = Boards
-    MAX_API_RESPONSE_SIZE = 5000
+    MAX_API_RESPONSE_SIZE = 1000
 
     def get_records(self, format_values, additional_params=None):
         # Get max_api_response_size from config and set to parameter
-        response_size = self.config.get('max_api_response_size_card')
-        if response_size and int(response_size):
-            self.MAX_API_RESPONSE_SIZE = int(response_size)
+        cards_response_size = self.config.get('cards_response_size')
+        self.MAX_API_RESPONSE_SIZE = int(cards_response_size) if cards_response_size else self.MAX_API_RESPONSE_SIZE
         self.params = {'limit': self.MAX_API_RESPONSE_SIZE, 'customFieldItems': 'true'}
 
         # Set window_end with current time
@@ -389,8 +388,7 @@ class Cards(AddCustomFields, ChildStream):
         custom_fields_map, dropdown_options_map = self.build_custom_fields_maps(parent_id_list=format_values)
 
         while True:
-            # Get records for cards before specified time or card ID
-            # Trello use standard Mongo IDs so we can pass Card ID as trello will derive the date from it.
+            # Get records for cards before specified time
             # Reference: https://developer.atlassian.com/cloud/trello/guides/rest-api/api-introduction/#paging
             records = self.client.get(self._format_endpoint(format_values), params={"before": window_end,
                                                                                    **self.params})
@@ -398,7 +396,7 @@ class Cards(AddCustomFields, ChildStream):
             # Raise exception if API returns more data than specified limit
             if self.MAX_API_RESPONSE_SIZE and len(records) > self.MAX_API_RESPONSE_SIZE:
                 raise Exception(
-                    ("{}: Number of records returned is greater than max API response size of {}.").format(
+                    ("{}: Number of records returned is greater than the requested API response size of {}.").format(
                         self.stream_id,
                         self.MAX_API_RESPONSE_SIZE)
                 )
