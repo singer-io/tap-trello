@@ -260,17 +260,18 @@ class TestTrelloStartDate(unittest.TestCase):
         ##########################################################################
         syncing_incremental = False
         for stream in self.testable_streams():
-            if utils.get_replication_method(stream) == self.INCREMENTAL:
-                # Verify the 1st sync replicated less data than the 2nd if syncing inc streams
-                self.assertGreater(replicated_row_count_2, replicated_row_count_1,
-                                   msg="we replicated less data with an older start date\n" +
-                                   "------------------------------\n" +
-                                   "Start Date 1: {} ".format(start_date_1) +
-                                   "Row Count 1: {}\n".format(replicated_row_count_1) +
-                                   "------------------------------\n" +
-                                   "Start Date 2: {} ".format(start_date_2) +
-                                   "Row Count 2: {}\n".format(replicated_row_count_2))
-                syncing_incremental = True
+            with self.subTest(stream=stream):
+                if utils.get_replication_method(stream) == self.INCREMENTAL:
+                    # Verify the 1st sync replicated less data than the 2nd if syncing inc streams
+                    self.assertGreater(replicated_row_count_2, replicated_row_count_1,
+                                       msg="we replicated less data with an older start date\n" +
+                                       "------------------------------\n" +
+                                       "Start Date 1: {} ".format(start_date_1) +
+                                       "Row Count 1: {}\n".format(replicated_row_count_1) +
+                                       "------------------------------\n" +
+                                       "Start Date 2: {} ".format(start_date_2) +
+                                       "Row Count 2: {}\n".format(replicated_row_count_2))
+                    syncing_incremental = True
 
         if not syncing_incremental:
             # Verify the 1st and 2nd sync replicated the same number of records if not syncing inc streams

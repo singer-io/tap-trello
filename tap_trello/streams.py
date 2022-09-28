@@ -1,7 +1,7 @@
 from datetime import datetime, timedelta
 from itertools import dropwhile
+import operator
 import singer
-
 from singer import utils
 
 LOGGER = singer.get_logger()
@@ -20,9 +20,9 @@ class OrderChecker:
         Actions, this ensures that this holds up.
         """
         if self.order == 'ASC':
-            check_paired_order = lambda a, b: a < b
+            check_paired_order = operator.lt
         else:
-            check_paired_order = lambda a, b: a > b
+            check_paired_order = operator.gt
 
         if self._last_value is None:
             self._last_value = current_value
@@ -184,16 +184,16 @@ class Stream:
         self.state = state
 
 
-    def get_format_values(self): # pylint: disable=no-self-use
+    def get_format_values(self):
         return []
 
     def _format_endpoint(self, format_values):
         return self.endpoint.format(*format_values)
 
-    def modify_record(self, record, **kwargs): # pylint: disable=no-self-use,unused-argument
+    def modify_record(self, record, **kwargs): # pylint: disable=unused-argument
         return record
 
-    def build_custom_fields_maps(self, **kwargs): # pylint: disable=no-self-use,unused-argument
+    def build_custom_fields_maps(self, **kwargs): # pylint: disable=unused-argument
         return {}, {}
 
     def get_records(self, format_values, additional_params=None):
@@ -228,7 +228,7 @@ class Stream:
             yield rec
 
 class AddCustomFields(Mixin):
-    def _get_dropdown_option_key(self, field_id, option_id): # pylint: disable=no-self-use
+    def _get_dropdown_option_key(self, field_id, option_id):
         return field_id + '_' + option_id
 
     def build_custom_fields_maps(self, **kwargs):
@@ -249,7 +249,7 @@ class AddCustomFields(Mixin):
         return custom_fields_map, dropdown_options_map
 
 
-    def modify_record(self, record, **kwargs): # pylint: disable=no-self-use
+    def modify_record(self, record, **kwargs):
         custom_fields_map = kwargs['custom_fields_map']
         dropdown_options_map = kwargs['dropdown_options_map']
         for custom_field in record['customFieldItems']:
@@ -263,7 +263,7 @@ class AddCustomFields(Mixin):
 
 
 class AddBoardId(Mixin):
-    def modify_record(self, record, **kwargs): # pylint: disable=no-self-use
+    def modify_record(self, record, **kwargs):
         boardIdList = kwargs['parent_id_list']
         assert len(boardIdList) == 1
         record["boardId"] = boardIdList[0]
@@ -282,7 +282,7 @@ class ChildStream(Stream):
         for parent_obj in parent.get_records(parent.get_format_values(), additional_params={"fields": "id"}):
             yield parent_obj['id']
 
-    def _sort_parent_ids_by_created(self, parent_ids): # pylint: disable=no-self-use
+    def _sort_parent_ids_by_created(self, parent_ids):
         # NB This is documented here. Yes it's hacky
         # - https://help.trello.com/article/759-getting-the-time-a-card-or-board-was-created
         parents = [{"id": x, "created": datetime.utcfromtimestamp(int(x[:8], 16))}
@@ -373,8 +373,52 @@ class Cards(AddCustomFields, ChildStream):
     key_properties = ["id"]
     replication_method = "FULL_TABLE"
     parent_class = Boards
-    MAX_API_RESPONSE_SIZE = 20000
-    params = {'limit': 20000, 'customFieldItems': 'true'}
+    MAX_API_RESPONSE_SIZE = 1000
+
+    def get_records(self, format_values, additional_params=None):
+        # Get max_api_response_size from config and set to parameter
+        cards_response_size = self.config.get('cards_response_size')
+        self.MAX_API_RESPONSE_SIZE = int(cards_response_size) if cards_response_size else self.MAX_API_RESPONSE_SIZE
+        self.params = {'limit': self.MAX_API_RESPONSE_SIZE, 'customFieldItems': 'true'}
+
+        # Set window_end with current time
+        window_end = utils.strftime(utils.now())
+
+        # Build custom fields and dropdown object map for the specific parent
+        custom_fields_map, dropdown_options_map = self.build_custom_fields_maps(parent_id_list=format_values)
+
+        while True:
+            # Get records for cards before specified time
+            # Reference: https://developer.atlassian.com/cloud/trello/guides/rest-api/api-introduction/#paging
+            records = self.client.get(self._format_endpoint(format_values), params={"before": window_end,
+                                                                                   **self.params})
+
+            # Raise exception if API returns more data than specified limit
+            if self.MAX_API_RESPONSE_SIZE and len(records) > self.MAX_API_RESPONSE_SIZE:
+                raise Exception(
+                    ("{}: Number of records returned is greater than the requested API response size of {}.").format(
+                        self.stream_id,
+                        self.MAX_API_RESPONSE_SIZE)
+                )
+
+            # Yielding records after adding custom fields and dropdown object map to all records
+            for rec in records:
+                yield self.modify_record(rec, parent_id_list = format_values, custom_fields_map = custom_fields_map, dropdown_options_map = dropdown_options_map)
+
+            LOGGER.info("%s - Collected  %s records for board %s.",
+                        self.stream_id,
+                        len(records),
+                        format_values[0])
+
+            # If records are same as limit then shift window to get older data
+            if len(records) == self.MAX_API_RESPONSE_SIZE:
+                # Sort cards based on card ID as API returns latest records but in unorder manner
+                records = sorted(records, key=lambda x: x['id'])
+                # API returns latest records so set window_end to smallest card id to get older data
+                window_end = records[0]["id"]
+            else:
+                # API returns less records than limit, break the pagination
+                break
 
 class Checklists(ChildStream):
     stream_id = "checklists"
