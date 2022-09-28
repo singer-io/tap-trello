@@ -3,7 +3,7 @@ from setuptools import setup
 
 setup(
     name="tap-trello",
-    version="1.0.0",
+    version="1.1.0",
     description="Singer.io tap for extracting data from Trello API",
     author="Stitch",
     url="http://singer.io",
