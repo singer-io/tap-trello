@@ -14,18 +14,19 @@ DEFAULT_CONFIG = {
 }
 
 @mock.patch('tap_trello.client.requests.request')
-class TestMaxAPIResponseSizeValue(unittest.TestCase):
+class TestCardsResponseSizeValue(unittest.TestCase):
     '''
-    Test that the max_api_response_size param is set correctly based on different config values
+    Test that the cards_response_size param is set correctly based on different config values
     '''
 
     def setUp(self):
+        '''Reset the response size to a value in every test'''
         # This is the default in the tap
         self.expected_response_size = 1000
 
     def test_param_value_from_config_for_cards(self, mock_request):
         '''
-        Test that when config parameter `cards_response_size` is passed the params is set correctly from the config value
+        Test that when the config param `cards_response_size` is passed, it is used
         '''
         self.expected_response_size = 200
         config = {**DEFAULT_CONFIG, "cards_response_size": self.expected_response_size}
@@ -36,7 +37,8 @@ class TestMaxAPIResponseSizeValue(unittest.TestCase):
 
     def test_default_param_value_for_cards(self, mock_request):
         '''
-        Test that when no config value is provided for `cards_response_size`, then default is taken as 1000
+        Test that when no config value is provided for the config param `cards_response_size`, then
+        the default is used
         '''
         client = TrelloClient(DEFAULT_CONFIG)
         card = Cards(client, DEFAULT_CONFIG, {})
@@ -45,8 +47,8 @@ class TestMaxAPIResponseSizeValue(unittest.TestCase):
 
     def test_empty_string_in_config(self, mock_request):
         '''
-        Test that when empty string value is provided for the config param `cards_response_size`, the default
-        value is taken and passed as 5000
+        Test that when empty string value is provided for the config param `cards_response_size`, 
+        the default value is used
         '''
         config = {**DEFAULT_CONFIG, "cards_response_size": ""}
         client = TrelloClient(config)
@@ -56,8 +58,8 @@ class TestMaxAPIResponseSizeValue(unittest.TestCase):
 
     def test_string_value_in_config(self, mock_request):
         '''
-        Test that when a string value is passe in the config param `cards_response_size`, it is converted to integer
-        and then passed
+        Test that when a string value is passed in the config param `cards_response_size`, it is 
+        converted to integer and then used
         '''
         self.expected_response_size = 300
         config = {**DEFAULT_CONFIG, "cards_response_size": str(self.expected_response_size)}
