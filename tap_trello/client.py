@@ -37,7 +37,7 @@ class TrelloClient():
         # NB: There are headers defining Trello version and Trello
         # environment (e.g., Production) here, might be useful in the
         # future. At initial development, version is 1.2083.0
-        response = requests.request(method, full_url, headers=headers, params=params, auth=self.oauth)
+        response = requests.request(method, full_url, headers=headers, params=params, auth=self.oauth, timeout=1800)
 
         response.raise_for_status()
         # TODO: Check error status, rate limit, etc.

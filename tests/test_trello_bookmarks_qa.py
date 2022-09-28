@@ -289,8 +289,12 @@ class TrelloBookmarksQA(unittest.TestCase):
                                          if message.get('id') == expected_record.get('id')].pop()
                         actual_fields = set(actual_record.keys())
                         expected_fields = set(expected_record.keys())
-                        if stream == 'cards':  # BUG (https://stitchdata.atlassian.net/browse/SRCE-4487)
-                            expected_fields.remove('cardRole')  # Remove when addressed
+                        # BUG https://jira.talendforge.org/browse/TDL-9680
+                        # BUG https://jira.talendforge.org/browse/TDL-20813
+                        if stream == 'cards':
+                            # Remove when addressed
+                            for field in ('cardRole', 'email'):
+                                expected_fields.remove(field)
                         self.assertEqual(expected_fields, actual_fields,
                                          msg="Field mismatch between expectations and replicated records in sync 1.")
 
