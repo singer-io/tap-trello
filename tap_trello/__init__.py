@@ -19,7 +19,7 @@ def main():
     state = args.state # pylint:disable=unused-variable
 
     if args.properties and not args.catalog:
-        raise Exception("DEPRECATED: Use of the 'properties' parameter is not supported. Please use --catalog instead")
+        raise DeprecationWarning("DEPRECATED: Use of the 'properties' parameter is not supported. Please use --catalog instead")
 
     if args.discover:
         LOGGER.info("Starting discovery mode")
