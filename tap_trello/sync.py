@@ -21,7 +21,7 @@ def do_sync(client, config, state, catalog):
         stream_object = STREAM_OBJECTS.get(stream_id)(client, config, state)
 
         if stream_object is None:
-            raise Exception("Attempted to sync unknown stream {}".format(stream_id))
+            raise RuntimeError("Attempted to sync unknown stream {}".format(stream_id))
 
         singer.write_schema(
             stream_id,
