@@ -1,5 +1,5 @@
 # tap-trello
-A Singer tap for extracting data from the Trello API
+A Singer tap for extracting data from the Trello API.
 
 This tap is currently under development.
 
