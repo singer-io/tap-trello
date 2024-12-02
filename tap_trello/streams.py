@@ -30,7 +30,7 @@ class OrderChecker:
         if check_paired_order(current_value, self._last_value):
             asc_desc = "ascending" if self.order == 'ASC' else "descending"
             gt_lt = "less than" if self.order == 'ASC' else "greater than"
-            raise Exception(
+            raise ValueError(
                 ("Detected out of order data. In {} sorted stream, current sorted " +
                  "value {} is {} last sorted value {}").format(
                      asc_desc,
@@ -213,7 +213,7 @@ class Stream:
             })
 
         if self.MAX_API_RESPONSE_SIZE and len(records) >= self.MAX_API_RESPONSE_SIZE:
-            raise Exception(
+            raise RuntimeError(
                 ("{}: Number of records returned is greater than max API response size of {}.").format(
                     self.stream_id,
                     self.MAX_API_RESPONSE_SIZE)
@@ -395,7 +395,7 @@ class Cards(AddCustomFields, ChildStream):
 
             # Raise exception if API returns more data than specified limit
             if self.MAX_API_RESPONSE_SIZE and len(records) > self.MAX_API_RESPONSE_SIZE:
-                raise Exception(
+                raise RuntimeError(
                     ("{}: Number of records returned is greater than the requested API response size of {}.").format(
                         self.stream_id,
                         self.MAX_API_RESPONSE_SIZE)

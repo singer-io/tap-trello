@@ -27,6 +27,7 @@ jobs:
           command: |
             source /usr/local/share/virtualenvs/tap-trello/bin/activate
             pip install coverage
+            pip install urllib3==1.26.6
             nosetests --with-coverage --cover-erase --cover-package=tap_trello --cover-html-dir=htmlcov tests/unittests
             coverage html
       - store_test_results:
