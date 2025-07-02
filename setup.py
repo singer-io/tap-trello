@@ -13,7 +13,7 @@ setup(
         "singer-python==5.13.2",
         "requests==2.32.4",
         "requests-oauthlib==1.3.0",
-        "backoff==1.8.0"
+        "backoff==1.10.0"
     ],
     extras_require={
         'dev': [
