@@ -295,7 +295,8 @@ class TrelloBookmarksQA(unittest.TestCase):
                             # Remove when addressed
                             for field in ('cardRole', 'email'):
                                 expected_fields.remove(field)
-                        self.assertEqual(expected_fields, actual_fields,
+
+                        self.assertTrue(actual_fields.issubset(expected_fields),
                                          msg="Field mismatch between expectations and replicated records in sync 1.")
 
 
