@@ -3,7 +3,7 @@
 ## 1.1.1
   * Updates dependency versions for twistlock compliance
   * Updates circle config and tests fix failing build
-  * [PR 36](https://github.com/singer-io/tap-trello/pull/36)
+  * [PR 35](https://github.com/singer-io/tap-trello/pull/35)
 
 ## 1.1.0
   * Adds optional config parameter `cards_response_size` and introduces pagination for cards stream
