@@ -17,9 +17,9 @@ setup(
     ],
     extras_require={
         'dev': [
-            'ipdb==0.11',
+            'ipdb',
             'pylint',
-            'nose'
+            'pytest'
         ]
     },
     entry_points="""
