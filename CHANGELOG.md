@@ -1,7 +1,7 @@
 # Changelog
 
 ## 1.2.0
-  * Added Parent relationship to child streams for metadata [PR 36](https://github.com/singer-io/tap-trello/pull/36)
+  * Added Parent relationship to child streams for metadata [PR 38](https://github.com/singer-io/tap-trello/pull/38)
 
 ## 1.1.1
   * Updates dependency versions for twistlock compliance
