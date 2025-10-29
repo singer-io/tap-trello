@@ -1,6 +1,8 @@
 from datetime import datetime, timedelta
 from itertools import dropwhile
 import operator
+
+import requests
 import singer
 from singer import utils
 
@@ -312,8 +314,13 @@ class ChildStream(Stream):
         for parent_id in parent_ids:
             singer.write_bookmark(self.state, self.stream_id, "parent_id", parent_id)
             singer.write_state(self.state)
-            for rec in self.get_records([parent_id]):
-                yield rec
+            try:
+                for rec in self.get_records([parent_id]):
+                    yield rec
+            except requests.exceptions.HTTPError as e:
+                if e.response.status_code == 404:
+                    continue
+                raise
         singer.clear_bookmark(self.state, self.stream_id, "parent_id")
         self.on_window_finished()
 
