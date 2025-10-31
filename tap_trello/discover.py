@@ -41,9 +41,9 @@ def do_discover():
             metadata.write(mdata, ('properties', field_name), 'inclusion', 'automatic')
 
         parent_class = getattr(stream, "parent_class", None)
-        if parent_class is not None:
-            parent_tap_stream_id = parent_class.stream_name
-            mdata[()].update({'parent-tap-stream-id': parent_tap_stream_id})
+        if parent_class:
+            mdata[()]['parent-tap-stream-id'] = getattr(parent_class, "stream_name", None)
+
 
         catalog_entry = {
             "stream": stream_name,
