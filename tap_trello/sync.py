@@ -1,42 +1,67 @@
 import singer
-from singer import Transformer, metadata
-
-from .streams import STREAM_OBJECTS
+from typing import Dict
+from tap_trello.streams import STREAMS
+from tap_trello.client import Client
 
 LOGGER = singer.get_logger()
 
 
-def do_sync(client, config, state, catalog):
-    # stream_object = STREAM_OBJECTS.get("boards")(client, config, state)
-    # for rec in stream_object.sync():
-    #     singer.write_record(
-    #         "boards",
-    #         rec
-    #     )
-    selected_streams = catalog.get_selected_streams(state)
+def update_currently_syncing(state: Dict, stream_name: str) -> None:
+    """
+    Update currently_syncing in state and write it
+    """
+    if not stream_name and singer.get_currently_syncing(state):
+        del state["currently_syncing"]
+    else:
+        singer.set_currently_syncing(state, stream_name)
+    singer.write_state(state)
 
-    for stream in selected_streams:
-        stream_id = stream.tap_stream_id
-        stream_schema = stream.schema
-        stream_object = STREAM_OBJECTS.get(stream_id)(client, config, state)
 
-        if stream_object is None:
-            raise Exception("Attempted to sync unknown stream {}".format(stream_id))
+def write_schema(stream, client, streams_to_sync, catalog) -> None:
+    """
+    Write schema for stream and its children
+    """
+    if stream.is_selected():
+        stream.write_schema()
 
-        singer.write_schema(
-            stream_id,
-            stream_schema.to_dict(),
-            stream_object.key_properties,
-            stream_object.replication_keys,
-        )
+    for child in stream.children:
+        child_obj = STREAMS[child](client, catalog.get_stream(child))
+        write_schema(child_obj, client, streams_to_sync, catalog)
+        if child in streams_to_sync:
+            stream.child_to_sync.append(child_obj)
 
-        LOGGER.info("Syncing stream: %s", stream_id)
 
-        with Transformer() as transformer:
-            for rec in stream_object.sync():
-                singer.write_record(
-                    stream_id,
-                    transformer.transform(
-                        rec, stream.schema.to_dict(), metadata.to_map(stream.metadata),
-                    )
+def sync(client: Client, config: Dict, catalog: singer.Catalog, state) -> None:
+    """
+    Sync selected streams from catalog
+    """
+
+    streams_to_sync = []
+    for stream in catalog.get_selected_streams(state):
+        streams_to_sync.append(stream.stream)
+    LOGGER.info("selected_streams: {}".format(streams_to_sync))
+
+    last_stream = singer.get_currently_syncing(state)
+    LOGGER.info("last/currently syncing stream: {}".format(last_stream))
+
+    with singer.Transformer() as transformer:
+        for stream_name in streams_to_sync:
+
+            stream = STREAMS[stream_name](client, catalog.get_stream(stream_name))
+            if stream.parent:
+                if stream.parent not in streams_to_sync:
+                    streams_to_sync.append(stream.parent)
+                continue
+
+            write_schema(stream, client, streams_to_sync, catalog)
+            LOGGER.info("START Syncing: {}".format(stream_name))
+            update_currently_syncing(state, stream_name)
+            total_records = stream.sync(state=state, transformer=transformer)
+
+            update_currently_syncing(state, None)
+            LOGGER.info(
+                "FINISHED Syncing: {}, total_records: {}".format(
+                    stream_name, total_records
                 )
+            )
+
