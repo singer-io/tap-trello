@@ -1,1 +1,35 @@
-{}
+{
+    "type": "object",
+    "properties": {
+        "id": {
+            "type": [
+                "null",
+                "string"
+            ]
+        },
+        "idBoard": {
+            "type": [
+                "null",
+                "string"
+            ]
+        },
+        "name": {
+            "type": [
+                "null",
+                "string"
+            ]
+        },
+        "color": {
+            "type": [
+                "null",
+                "string"
+            ]
+        },
+        "uses": {
+            "type": [
+                "null",
+                "integer"
+            ]
+        }
+    }
+}

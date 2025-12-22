@@ -1,1 +1,40 @@
-{}
+{
+    "type": "object",
+    "properties": {
+        "id": {
+            "type": [
+                "null",
+                "string"
+            ]
+        },
+        "value": {
+            "type": "object",
+            "properties": {
+                "checked": {
+                    "type": [
+                        "null",
+                        "string"
+                    ]
+                }
+            }
+        },
+        "idCustomField": {
+            "type": [
+                "null",
+                "string"
+            ]
+        },
+        "idModel": {
+            "type": [
+                "null",
+                "string"
+            ]
+        },
+        "modelType": {
+            "type": [
+                "null",
+                "string"
+            ]
+        }
+    }
+}

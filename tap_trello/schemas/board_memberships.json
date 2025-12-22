@@ -1,1 +1,35 @@
-{}
+{
+    "type": "object",
+    "properties": {
+        "id": {
+            "type": [
+                "null",
+                "string"
+            ]
+        },
+        "idMember": {
+            "type": [
+                "null",
+                "string"
+            ]
+        },
+        "memberType": {
+            "type": [
+                "null",
+                "string"
+            ]
+        },
+        "unconfirmed": {
+            "type": [
+                "null",
+                "boolean"
+            ]
+        },
+        "deactivated": {
+            "type": [
+                "null",
+                "boolean"
+            ]
+        }
+    }
+}
