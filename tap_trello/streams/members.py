@@ -6,4 +6,3 @@ class Members(FullTableStream):
     replication_method = "FULL_TABLE"
     path = "/members/{id}"
     parent = "boards"
-

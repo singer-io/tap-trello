@@ -6,4 +6,3 @@ class BoardCustomFields(FullTableStream):
     replication_method = "FULL_TABLE"
     path = "/boards/{id}/customFields"
     parent = "boards"
-

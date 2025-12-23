@@ -21,4 +21,3 @@ STREAMS = {
     "organization_members": OrganizationMembers,
     "organization_memberships": OrganizationMemberships,
 }
-

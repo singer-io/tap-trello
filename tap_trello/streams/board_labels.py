@@ -6,4 +6,3 @@ class BoardLabels(FullTableStream):
     replication_method = "FULL_TABLE"
     path = "/boards/{id}/labels"
     parent = "boards"
-
