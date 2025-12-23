@@ -7,6 +7,12 @@
                 "string"
             ]
         },
+        "organization_id": {
+            "type": [
+                "null",
+                "string"
+            ]
+        },
         "activityBlocked": {
             "type": [
                 "null",

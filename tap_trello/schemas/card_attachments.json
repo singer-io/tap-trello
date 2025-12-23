@@ -7,6 +7,12 @@
                 "string"
             ]
         },
+        "card_id": {
+            "type": [
+                "null",
+                "string"
+            ]
+        },
         "bytes": {
             "type": [
                 "null",

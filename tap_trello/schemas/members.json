@@ -7,6 +7,12 @@
                 "string"
             ]
         },
+        "boardId": {
+            "type": [
+                "null",
+                "string"
+            ]
+        },
         "aaId": {
             "type": [
                 "null",
