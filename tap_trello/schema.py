@@ -73,7 +73,18 @@ def get_schemas() -> Tuple[Dict, Dict]:
 
         parent_tap_stream_id = getattr(stream_obj, "parent", None)
         if parent_tap_stream_id:
-            mdata = metadata.write(mdata, (), 'parent-tap-stream-id', parent_tap_stream_id)
+            # Handle both streams where parent is a string and another is a class
+            if isinstance(parent_tap_stream_id, str):
+                # Parent is already a string tap_stream_id
+                pass
+            elif hasattr(parent_tap_stream_id, 'stream_id'):
+                # Parent is a class reference, get its stream_id
+                parent_tap_stream_id = parent_tap_stream_id.stream_id
+            else:
+                parent_tap_stream_id = None
+
+            if parent_tap_stream_id:
+                mdata = metadata.write(mdata, (), 'parent-tap-stream-id', parent_tap_stream_id)
 
         mdata = metadata.to_list(mdata)
         field_metadata[stream_name] = mdata

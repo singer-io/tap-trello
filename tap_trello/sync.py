@@ -1,7 +1,9 @@
-import singer
 from typing import Dict
-from tap_trello.streams import STREAMS
+
+import singer
+
 from tap_trello.client import Client
+from tap_trello.streams import STREAMS
 
 LOGGER = singer.get_logger()
 

@@ -8,7 +8,7 @@ from singer import get_logger, metrics
 
 from tap_trello.exceptions import (ERROR_CODE_EXCEPTION_MAPPING,
                                    TrelloError,
-                                   TrelloBackoffError)
+                                   TrelloBackoffError, TrelloRateLimitError)
 
 LOGGER = get_logger()
 REQUEST_TIMEOUT = 300
@@ -102,7 +102,8 @@ class Client:
             ConnectionError,
             ChunkedEncodingError,
             Timeout,
-            TrelloBackoffError
+            TrelloBackoffError,
+            TrelloRateLimitError
         ),
         max_tries=5,
         factor=2,
