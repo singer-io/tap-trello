@@ -4,4 +4,7 @@ class Organizations(FullTableStream):
     tap_stream_id = "organizations"
     key_properties = ["id"]
     replication_method = "FULL_TABLE"
-    path = "/organizations/{id}"
+    path = "/members/me/organizations"
+
+    def parse_response(self, response):
+        return response.json()

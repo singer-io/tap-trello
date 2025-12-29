@@ -36,23 +36,23 @@ This tap:
 
 
 **[board_memberships](https://developer.atlassian.com/cloud/trello/rest/api-group-boards/#api-boards-id-memberships-get)**
-- Primary keys: ['id']
+- Primary keys: ['id', 'boardId']
 - Replication strategy: FULL_TABLE
 
 **[board_custom_fields](https://developer.atlassian.com/cloud/trello/rest/api-group-boards/#api-boards-id-customfields-get)**
-- Primary keys: ['id']
+- Primary keys: ['id', 'boardId']
 - Replication strategy: FULL_TABLE
 
 **[board_labels](https://developer.atlassian.com/cloud/trello/rest/api-group-boards/#api-boards-id-labels-get)**
-- Primary keys: ['id']
+- Primary keys: ['id', 'boardId']
 - Replication strategy: FULL_TABLE
 
 **[card_attachments](https://developer.atlassian.com/cloud/trello/rest/api-group-cards/#api-cards-id-attachments-get)**
-- Primary keys: ['id']
+- Primary keys: ['id', 'card_id']
 - Replication strategy: FULL_TABLE
 
 **[card_custom_field_items](https://developer.atlassian.com/cloud/trello/rest/api-group-cards/#api-cards-id-customfielditems-get)**
-- Primary keys: ['id']
+- Primary keys: ['id', 'card_id']
 - Replication strategy: FULL_TABLE
 
 **[members](https://developer.atlassian.com/cloud/trello/rest/api-group-members/#api-members-id-get)**
@@ -64,15 +64,15 @@ This tap:
 - Replication strategy: FULL_TABLE
 
 **[organization_actions](https://developer.atlassian.com/cloud/trello/rest/api-group-organizations/#api-organizations-id-actions-get)**
-- Primary keys: ['id']
+- Primary keys: ['id', 'organization_id']
 - Replication strategy: INCREMENTAL
 
 **[organization_members](https://developer.atlassian.com/cloud/trello/rest/api-group-organizations/#api-organizations-id-members-get)**
-- Primary keys: ['id']
+- Primary keys: ['id', 'organization_id']
 - Replication strategy: FULL_TABLE
 
 **[organization_memberships](https://developer.atlassian.com/cloud/trello/rest/api-group-organizations/#api-organizations-id-memberships-get)**
-- Primary keys: ['id']
+- Primary keys: ['id', 'organization_id']
 - Replication strategy: FULL_TABLE
 
 

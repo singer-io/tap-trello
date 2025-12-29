@@ -53,7 +53,7 @@ class Cards(AddCustomFields, ChildStream):
 
             # If records are same as limit then shift window to get older data
             if len(records) == self.MAX_API_RESPONSE_SIZE:
-                # Sort cards based on card ID as API returns latest records but in unorder manner
+                # Sort cards based on card ID as API returns latest records but in unordered manner
                 records = sorted(records, key=lambda x: x['id'])
                 # API returns latest records so set window_end to smallest card id to get older data
                 window_end = records[0]["id"]

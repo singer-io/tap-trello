@@ -102,7 +102,7 @@ class DateWindowPaginated(Mixin):
         end_date = self.config.get('end_date', window_end)
 
         window_start = utils.strptime_to_utc(max(adjusted_window_start, start_date))
-        sub_window_end = sub_window_end and  utils.strptime_to_utc(min(sub_window_end, end_date))
+        sub_window_end = sub_window_end and utils.strptime_to_utc(min(sub_window_end, end_date))
         window_end = utils.strptime_to_utc(min(window_end, end_date))
 
         return window_start, sub_window_end, window_end
@@ -356,7 +356,7 @@ class BaseStream(ABC):
     path = ""
     page_size = 1000
     next_page_key = "page"
-    headers = {'Accept': 'application/json'}
+    headers = {'Accept': 'application/json', 'Content-Type': 'application/json'}
     children = []
     parent = ""
     data_key = ""
@@ -371,7 +371,6 @@ class BaseStream(ABC):
         self.metadata = metadata.to_map(catalog.metadata) if catalog else {}
         self.child_to_sync = []
         self.params = {}
-        self.headers = {'Accept': 'application/json', 'Content-Type': 'application/json'}
         self.data_payload = {}
 
     @property
@@ -429,6 +428,7 @@ class BaseStream(ABC):
         """Interacts with api client interaction and pagination."""
         self.params["page"] = self.page_size
         next_page = 1
+
         while next_page:
             response = self.client.make_request(
                 self.http_method,
@@ -438,10 +438,27 @@ class BaseStream(ABC):
                 body=json.dumps(self.data_payload),
                 path=self.path
             )
-            raw_records = response.get(self.data_key, [])
-            next_page = response.get(self.next_page_key)
+            # Some Trello endpoints return a raw list of objects instead of a
+            # dict containing a data key / pagination info. Handle both shapes.
+            if isinstance(response, dict):
+                raw_records = response.get(self.data_key, [])
+                next_page = response.get(self.next_page_key)
+            elif isinstance(response, list):
+                raw_records = response
+                next_page = None
+            else:
+                LOGGER.warning(
+                    "%s - Unexpected response type %s from endpoint %s",
+                    getattr(self, 'tap_stream_id', str(self.__class__)),
+                    type(response),
+                    self.url_endpoint,
+                )
+                raw_records = []
+                next_page = None
 
-            self.params[self.next_page_key] = next_page
+            if next_page:
+                self.params[self.next_page_key] = next_page
+
             yield from raw_records
 
     def write_schema(self) -> None:
@@ -478,7 +495,39 @@ class BaseStream(ABC):
         """
         Get the URL endpoint for the stream
         """
-        return self.url_endpoint or f"{self.client.base_url}/{self.path}"
+        if not parent_obj:
+            return self.url_endpoint or f"{self.client.base_url}/{self.path}"
+
+        parent_id = None
+        if isinstance(parent_obj, dict):
+            parent_id = parent_obj.get('id')
+            LOGGER.info("parent_obj id: %s", parent_id)
+
+            if not parent_id:
+                for key in ['idOrganization', 'idBoard', 'boardId', 'organization_id', 'organizationId']:
+                    parent_id = parent_obj.get(key)
+                    if parent_id:
+                        break
+
+        if not parent_id:
+            LOGGER.warning(
+                "Could not extract parent id for %s from parent_obj keys: %s",
+                getattr(self, 'tap_stream_id', 'unknown'),
+                list(parent_obj.keys()) if isinstance(parent_obj, dict) else type(parent_obj)
+            )
+            return f"{self.client.base_url}/{self.path}"
+
+        try:
+            return f"{self.client.base_url}/{self.path.format(id=parent_id)}"
+        except (KeyError, ValueError):
+            try:
+                return f"{self.client.base_url}/{self.path.format(parent_id)}"
+            except Exception as e:
+                LOGGER.error(
+                    "Failed to format URL for %s with path %s and parent_id %s: %s",
+                    getattr(self, 'tap_stream_id', 'unknown'), self.path, parent_id, e
+                )
+                return f"{self.client.base_url}/{self.path}"
 
 
 class IncrementalStream(BaseStream):
@@ -616,10 +665,6 @@ class ParentBaseStream(IncrementalStream):
 
 class ChildBaseStream(IncrementalStream):
     """Base Class for Child Stream."""
-
-    def get_url_endpoint(self, parent_obj=None):
-        """Prepare URL endpoint for child streams."""
-        return f"{self.client.base_url}/{self.path.format(parent_obj['id'])}"
 
     def get_bookmark(self, state: Dict, stream: str, key: Any = None) -> int:
         """Singleton bookmark value for child streams."""
