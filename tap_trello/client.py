@@ -4,7 +4,7 @@ import backoff
 import requests
 
 from requests import session
-from requests.exceptions import ChunkedEncodingError, ConnectionError, Timeout
+from requests.exceptions import ChunkedEncodingError, ConnectionError, Timeout # pylint: disable=redefined-builtin
 from requests_oauthlib import OAuth1
 
 from singer import get_logger, metrics

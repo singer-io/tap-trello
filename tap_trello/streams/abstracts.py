@@ -3,7 +3,7 @@ import json
 import operator
 from datetime import datetime, timedelta
 from itertools import dropwhile
-from typing import Any, Dict, Tuple, List, Iterator
+from typing import Any, Dict, Tuple, List, Iterator, Optional
 
 import singer
 from singer import (Transformer, get_bookmark, get_logger, metadata, metrics,
@@ -438,23 +438,7 @@ class BaseStream(ABC):
                 body=json.dumps(self.data_payload),
                 path=self.path
             )
-            # Some Trello endpoints return a raw list of objects instead of a
-            # dict containing a data key / pagination info. Handle both shapes.
-            if isinstance(response, dict):
-                raw_records = response.get(self.data_key, [])
-                next_page = response.get(self.next_page_key)
-            elif isinstance(response, list):
-                raw_records = response
-                next_page = None
-            else:
-                LOGGER.warning(
-                    "%s - Unexpected response type %s from endpoint %s",
-                    getattr(self, 'tap_stream_id', str(self.__class__)),
-                    type(response),
-                    self.url_endpoint,
-                )
-                raw_records = []
-                next_page = None
+            raw_records, next_page = self._normalize_response(response, self.url_endpoint)
 
             if next_page:
                 self.params[self.next_page_key] = next_page
@@ -501,7 +485,6 @@ class BaseStream(ABC):
         parent_id = None
         if isinstance(parent_obj, dict):
             parent_id = parent_obj.get('id')
-            LOGGER.info("parent_obj id: %s", parent_id)
 
             if not parent_id:
                 for key in ['idOrganization', 'idBoard', 'boardId', 'organization_id', 'organizationId']:
@@ -528,6 +511,36 @@ class BaseStream(ABC):
                     getattr(self, 'tap_stream_id', 'unknown'), self.path, parent_id, e
                 )
                 return f"{self.client.base_url}/{self.path}"
+
+    def _normalize_response(self, response: Any, url: str) -> Tuple[list, Optional[Any]]:
+        """
+        Normalize different Trello response shapes into (raw_records, next_page).
+
+        Returns a tuple where raw_records is a list of record dicts and next_page or None.
+        """
+        if isinstance(response, dict):
+            # Check if this is a paginated response with a data_key
+            if self.data_key and self.data_key in response:
+                raw_records = response.get(self.data_key, [])
+                next_page = response.get(self.next_page_key)
+            else:
+                # Handle single record response '/members/{id}' returns one member dict
+                raw_records = [response]
+                next_page = None
+        elif isinstance(response, list):
+            raw_records = response
+            next_page = None
+        else:
+            LOGGER.warning(
+                "%s - Unexpected response type %s from endpoint %s",
+                getattr(self, 'tap_stream_id', str(self.__class__)),
+                type(response),
+                url,
+            )
+            raw_records = []
+            next_page = None
+
+        return raw_records, next_page
 
 
 class IncrementalStream(BaseStream):

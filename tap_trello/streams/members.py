@@ -17,24 +17,15 @@ class Members(FullTableStream):
         """
         Override to support this endpoint which returns a single dict for a single record.
         """
+        url = self.url_endpoint or self.get_url_endpoint(getattr(self, 'parent_obj', None))
         response = self.client.make_request(
             self.http_method,
-            self.url_endpoint or self.get_url_endpoint(getattr(self, 'parent_obj', None)),
+            url,
             self.params,
             self.headers,
             body=json.dumps(self.data_payload),
             path=self.path
         )
 
-        if isinstance(response, dict):
-            yield response
-        elif isinstance(response, list):
-            for record in response:
-                yield record
-        else:
-            LOGGER.warning(
-                "%s - Unexpected response type %s from endpoint %s",
-                getattr(self, 'tap_stream_id', str(self.__class__)),
-                type(response),
-                self.url_endpoint
-            )
+        raw_records, _ = self._normalize_response(response, url)
+        yield from raw_records

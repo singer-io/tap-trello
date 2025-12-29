@@ -72,7 +72,7 @@ def get_schemas() -> Tuple[Dict, Dict]:
                 )
 
         parent_tap_stream_id = getattr(stream_obj, "parent", None)
-        if parent_tap_stream_id:
+        if parent_tap_stream_id:  # pylint: disable=using-constant-test
             # Handle both streams where parent is a string and another is a class
             if isinstance(parent_tap_stream_id, str):
                 # Parent is already a string tap_stream_id
