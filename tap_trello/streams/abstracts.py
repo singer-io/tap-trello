@@ -277,9 +277,9 @@ class AddCustomFields(Mixin):
 
 class AddBoardId(Mixin):
     def modify_record(self, record, **kwargs):
-        boardIdList = kwargs['parent_id_list']
-        assert len(boardIdList) == 1
-        record["boardId"] = boardIdList[0]
+        board_id_list = kwargs['parent_id_list']
+        assert len(board_id_list) == 1
+        record["boardId"] = board_id_list[0]
         return record
 
 
