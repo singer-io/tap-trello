@@ -36,7 +36,7 @@ def update_currently_syncing(state: Dict, stream_name: str) -> None:
     singer.write_state(state)
 
 
-def write_schema(stream, client, streams_to_sync, catalog, config, state) -> None:
+def write_schema(stream, client, streams_to_sync, catalog, config=None, state=None) -> None:
     """
     Write schema for stream and its children
     """
