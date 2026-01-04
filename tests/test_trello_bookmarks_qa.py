@@ -1,4 +1,3 @@
-import os
 import logging
 import unittest
 import random
@@ -9,92 +8,20 @@ from functools import reduce
 import tap_tester.connections as connections
 import tap_tester.menagerie   as menagerie
 import tap_tester.runner      as runner
+
 import trello_utils as utils
+from base import TrelloBaseTest
 
 
-class TrelloBookmarksQA(unittest.TestCase):
-    START_DATE = ""
-    START_DATE_FORMAT = "%Y-%m-%dT00:00:00Z"
-    TEST_TIME_FORMAT = "%Y-%m-%dT%H:%M:%S.%fZ"
+class TrelloBookmarksQA(TrelloBaseTest):
     LOOKBACK_WINDOW = 1  # days
-
-    def setUp(self):
-        missing_envs = [x for x in [
-            "TAP_TRELLO_CONSUMER_KEY",
-            "TAP_TRELLO_CONSUMER_SECRET",
-            "TAP_TRELLO_ACCESS_TOKEN",
-            "TAP_TRELLO_ACCESS_TOKEN_SECRET",
-        ] if os.getenv(x) == None]
-        if len(missing_envs) != 0:
-            raise Exception("Missing environment variables: {}".format(missing_envs))
 
     def name(self):
         return "tap_tester_trello_bookmarks_qa"
 
-    def get_type(self):
-        return "platform.trello"
-
-    def get_credentials(self):
-        return {
-            'consumer_key': os.getenv('TAP_TRELLO_CONSUMER_KEY'),
-            'consumer_secret': os.getenv('TAP_TRELLO_CONSUMER_SECRET'),
-            'access_token': os.getenv('TAP_TRELLO_ACCESS_TOKEN'),
-            'access_token_secret': os.getenv('TAP_TRELLO_ACCESS_TOKEN_SECRET'),
-        }
-
     def untestable_streams(self):
         return {
             'users',
-        }
-
-    def expected_check_streams(self):
-        return {
-            'actions',
-            'boards',
-            'cards',
-            'checklists',
-            'lists',
-            'users'
-        }
-
-    def expected_sync_streams(self):
-        return self.expected_check_streams()
-
-    def expected_full_table_sync_streams(self):
-        return {
-            'boards',
-            'cards',
-            'checklists',
-            'lists',
-            'users',
-        }
-
-    def expected_incremental_sync_streams(self):
-        return {
-            'actions'
-        }
-
-    def tap_name(self):
-        return "tap-trello"
-
-    def expected_pks(self):
-        return {
-            'boards' : {'id'},
-            'users' : {'id', "boardId"},
-            'lists' : {'id'},
-            'actions' : {'id'},
-            'cards' : {'id'},
-            'checklists' : {'id'}
-        }
-
-    def expected_automatic_fields(self):
-        return {
-            'boards' : {'id'},
-            'users' : {'id', 'boardId'},
-            'lists' : {'id'},
-            'actions' : {'id', 'date'},
-            'cards' : {'id'},
-            'checklists' : {'id'}
         }
 
     def get_properties(self):
@@ -108,7 +35,7 @@ class TrelloBookmarksQA(unittest.TestCase):
         # ensure data exists for sync streams and set expectations
         expected_records_1 = {x: [] for x in self.expected_sync_streams()} # ids by stream
         for stream in self.expected_sync_streams().difference(self.untestable_streams()):
-            if stream in self.expected_incremental_sync_streams():
+            if stream in self.expected_incremental_streams():
                 start_date = dt.strptime(self.get_properties().get('start_date'), self.START_DATE_FORMAT)
                 since = start_date.strftime(self.TEST_TIME_FORMAT)
                 _, existing_objects = utils.get_total_record_count_and_objects(stream, since=since)
@@ -189,8 +116,13 @@ class TrelloBookmarksQA(unittest.TestCase):
 
         # Verify bookmarks were saved for all streams
         state_1 = menagerie.get_state(conn_id)
-        for stream in self.expected_incremental_sync_streams():
-            self.assertTrue(state_1.get('bookmarks', {}).get(stream, {}).get('window_start', {}))
+        for stream in self.expected_incremental_streams():
+            # Check that bookmark exists (could be 'window_start' or 'date' depending on stream)
+            bookmark = state_1.get('bookmarks', {}).get(stream, {})
+            self.assertTrue(bookmark, msg=f"No bookmark found for stream {stream}")
+            # Verify bookmark has either window_start or date field
+            has_bookmark_field = 'window_start' in bookmark or 'date' in bookmark
+            self.assertTrue(has_bookmark_field, msg=f"Stream {stream} bookmark missing window_start or date field")
         print("Bookmarks meet expectations")
 
         # Generate data between syncs for bookmarking streams
@@ -199,6 +131,10 @@ class TrelloBookmarksQA(unittest.TestCase):
         for stream in self.expected_full_table_sync_streams().difference(self.untestable_streams()):
             for _ in range(1):
                 new_object = utils.create_object(stream)
+                if new_object is None:
+                    # Stream cannot have test data created
+                    logging.info("Skipping data creation for stream: {} (uncreatable stream)".format(stream))
+                    break
                 expected_records_2[stream].append({field: new_object.get(field)
                                                    for field in self.expected_automatic_fields().get(stream)})
 
@@ -210,9 +146,16 @@ class TrelloBookmarksQA(unittest.TestCase):
         updated_records['actions'].append(updated_action)
 
         # Get new actions from data manipulation between syncs
-        print("Acquriing in-test actions prior to 2nd sync")
-        for stream in self.expected_incremental_sync_streams().difference(self.untestable_streams()):
-            state = dt.strptime(state_1.get('bookmarks').get(stream).get('window_start'), self.TEST_TIME_FORMAT)
+        print("Acquiring in-test actions prior to 2nd sync")
+        for stream in self.expected_incremental_streams().difference(self.untestable_streams()):
+            bookmark = state_1.get('bookmarks').get(stream, {})
+            # Get bookmark value - could be 'window_start' (actions) or 'date' (organization_actions)
+            bookmark_value = bookmark.get('window_start') or bookmark.get('date')
+            if not bookmark_value:
+                logging.warning(f"No bookmark found for stream {stream}, skipping")
+                continue
+
+            state = dt.strptime(bookmark_value, self.TEST_TIME_FORMAT)
             since = (state - timedelta(days=self.LOOKBACK_WINDOW)).strftime(self.TEST_TIME_FORMAT)
             # start_date = dt.strptime(self.get_properties().get('start_date'), self.START_DATE_FORMAT)
             # since = start_date.strftime(self.TEST_TIME_FORMAT)
@@ -243,8 +186,12 @@ class TrelloBookmarksQA(unittest.TestCase):
 
         # Verify bookmarks were saved as expected inc streams
         state_2 = menagerie.get_state(conn_id)
-        for stream in self.expected_incremental_sync_streams():
-            self.assertTrue(state_2.get('bookmarks', {}).get(stream, {}).get('window_start', {}))
+        for stream in self.expected_incremental_streams():
+            # Verify bookmarks were saved as expected inc streams
+            bookmark = state_2.get('bookmarks', {}).get(stream, {})
+            self.assertTrue(bookmark, msg=f"No bookmark found for stream {stream}")
+            has_bookmark_field = 'window_start' in bookmark or 'date' in bookmark
+            self.assertTrue(has_bookmark_field, msg=f"Stream {stream} bookmark missing window_start or date field")
         print("Bookmarks meet expectations")
 
         # TESTING FULL TABLE STREAMS
@@ -308,7 +255,7 @@ class TrelloBookmarksQA(unittest.TestCase):
         print("Full table streams tested.")
 
         # TESTING INCREMENTAL STREAMS
-        for stream in self.expected_incremental_sync_streams().difference(self.untestable_streams()):
+        for stream in self.expected_incremental_streams().difference(self.untestable_streams()):
             with self.subTest(stream=stream):
                 record_count_1 = record_count_by_stream_1.get(stream, 0)
                 record_count_2 = record_count_by_stream_2.get(stream, 0)

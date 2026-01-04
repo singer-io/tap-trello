@@ -1,4 +1,3 @@
-import os
 import unittest
 import logging
 from datetime import datetime as dt
@@ -8,97 +7,32 @@ from functools import reduce
 import tap_tester.connections as connections
 import tap_tester.menagerie   as menagerie
 import tap_tester.runner      as runner
-import trello_utils as utils
 
-class TestTrelloStartDate(unittest.TestCase):
+import trello_utils as utils
+from base import TrelloBaseTest
+
+
+class TestTrelloStartDate(TrelloBaseTest):
     """Test that we are paginating for streams when exceeding the API record limit of a single query"""
 
-    START_DATE = ""
-    START_DATE_FORMAT = "%Y-%m-%dT00:00:00Z"
     API_LIMIT = 50
     INCREMENTAL = "INCREMENTAL"
     FULL_TABLE = "FULL_TABLE"
 
-    def setUp(self):
-        missing_envs = [x for x in [
-            "TAP_TRELLO_CONSUMER_KEY",
-            "TAP_TRELLO_CONSUMER_SECRET",
-            "TAP_TRELLO_ACCESS_TOKEN",
-            "TAP_TRELLO_ACCESS_TOKEN_SECRET",
-        ] if os.getenv(x) == None]
-        if len(missing_envs) != 0:
-            raise Exception("Missing environment variables: {}".format(missing_envs))
-
     def name(self):
         return "tap_tester_trello_start_date_test"
 
-    def get_type(self):
-        return "platform.trello"
-
-    def get_credentials(self):
-        return {
-            'consumer_key': os.getenv('TAP_TRELLO_CONSUMER_KEY'),
-            'consumer_secret': os.getenv('TAP_TRELLO_CONSUMER_SECRET'),
-            'access_token': os.getenv('TAP_TRELLO_ACCESS_TOKEN'),
-            'access_token_secret': os.getenv('TAP_TRELLO_ACCESS_TOKEN_SECRET'),
-        }
-
-    def testable_streams(self): # Rip this if all streams testable
-        return {
-            'actions',
-            'boards',
-            'cards',
-            'checklists',
-            'lists',
-            'users'
-        }
-    def expected_check_streams(self):
-        return {
-            'actions',
-            'boards',
-            'cards',
-            'checklists',
-            'lists',
-            'users'
-        }
-
-    def expected_sync_streams(self):
-        return self.expected_check_streams()
-
-    def expected_pks(self):
-        return {
-            "actions" : {"id"},
-            "boards" : {"id"},
-            'cards' : {'id'},
-            'checklists' : {'id'},
-            "lists" : {"id"},
-            "users" : {"id", "boardId"}
-        }
-
-    def expected_automatic_fields(self):
-        return {
-            "actions" : {"id", "date"},
-            "boards" : {"id"},
-            "cards" : {"id"},
-            "checklists" : {"id"},
-            "lists" : {"id"},
-            "users" : {"id", "boardId"}
-        }
-
-    def tap_name(self):
-        return "tap-trello"
-
     def get_properties(self, original: bool = True):
         return_value = {
-            'start_date' : dt.strftime(dt.utcnow(), self.START_DATE_FORMAT),  # set to utc today 
+            'start_date' : dt.strftime(dt.utcnow(), self.START_DATE_FORMAT),  # set to utc today
         }
         if original:
             return return_value
-        
+
         # Start Date test needs the new connections start date to be prior to the default
         assert self.START_DATE < return_value["start_date"]
 
-        # Assign start date to be the default 
+        # Assign start date to be the default
         return_value["start_date"] = self.START_DATE
         return return_value
 
@@ -136,6 +70,9 @@ class TestTrelloStartDate(unittest.TestCase):
             logging.info("Sufficient data does not exist for stream: {}".format(stream))
             for _ in range(required_record_count - record_count):
                 new_object = utils.create_object(stream)
+                if new_object is None:
+                    logging.warning("Could not create object for stream: {}".format(stream))
+                    continue
                 logging.info("Record generated for stream: {}".format(stream))
                 expected_records[stream].append({field: new_object.get(field)
                                                  for field in self.expected_automatic_fields().get(stream)})
@@ -284,7 +221,7 @@ class TestTrelloStartDate(unittest.TestCase):
                              "Start Date 2: {} ".format(start_date_2) +
                              "Row Count 2: {}\n".format(replicated_row_count_2))
 
-        # Test by each stream 
+        # Test by each stream
         for stream in self.testable_streams():
             with self.subTest(stream=stream):
                 if utils.get_replication_method(stream) == self.INCREMENTAL:

@@ -1,85 +1,30 @@
+import unittest
+import copy
+
+from functools import reduce
+
 import tap_tester.connections as connections
 import tap_tester.menagerie   as menagerie
 import tap_tester.runner      as runner
-import trello_utils as utils
 from singer import metadata
 
-import os
-import unittest
-import copy
-import logging
-import random
-from datetime import datetime as dt
-from datetime import timedelta
-from functools import reduce
+import trello_utils as utils
+from base import TrelloBaseTest
 
 
-
-class TestTrelloCustomFields(unittest.TestCase):
+class TestTrelloCustomFields(TrelloBaseTest):
     """Test that with no fields selected for a stream automatic fields are still replicated"""
-    START_DATE = ""
-    START_DATE_FORMAT = "%Y-%m-%dT00:00:00Z"
-
-    def setUp(self):
-        missing_envs = [x for x in [
-            "TAP_TRELLO_CONSUMER_KEY",
-            "TAP_TRELLO_CONSUMER_SECRET",
-            "TAP_TRELLO_ACCESS_TOKEN",
-            "TAP_TRELLO_ACCESS_TOKEN_SECRET",
-        ] if os.getenv(x) == None]
-        if len(missing_envs) != 0:
-            raise Exception("Missing environment variables: {}".format(missing_envs))
 
     def name(self):
         return "tap_tester_trello_custom_fields_test"
-
-    def get_type(self):
-        return "platform.trello"
-
-    def get_credentials(self):
-        return {
-            'consumer_key': os.getenv('TAP_TRELLO_CONSUMER_KEY'),
-            'consumer_secret': os.getenv('TAP_TRELLO_CONSUMER_SECRET'),
-            'access_token': os.getenv('TAP_TRELLO_ACCESS_TOKEN'),
-            'access_token_secret': os.getenv('TAP_TRELLO_ACCESS_TOKEN_SECRET'),
-        }
 
     def testable_streams(self):
         return {
             'cards',
         }
-    def expected_check_streams(self):
-        return {
-            'actions',
-            'boards',
-            'cards',
-            'checklists',
-            'lists',
-            'users'
-        }
 
-    def expected_sync_streams(self):
-        return self.expected_check_streams()
-
-    def expected_pks(self):
-        return {
-            'actions' : {"id"},
-            'boards' : {"id"},
-            'cards' : {'id'},
-            'checklists': {'id'},
-            'lists' : {"id"},
-            'users' : {"id", "boardId"}
-        }
-
-    def expected_automatic_fields(self):
-        return {
-            'actions' : {"id"},  #, "date"},
-            'boards' : {"id"},
-            'cards' : {'id'},
-            'checklists': {'id'},
-            'lists' : {"id"},
-            'users' : {"id", "boardId"}
-        }
+    def untestable_streams(self):
+        return {'card_attachments', 'organization_actions'}
 
     def expected_custom_fields(self):
         return {
@@ -88,14 +33,6 @@ class TestTrelloCustomFields(unittest.TestCase):
             "number",
             "text",
             "date",
-        }
-
-    def tap_name(self):
-        return "tap-trello"
-
-    def get_properties(self):
-        return {
-            'start_date' : dt.strftime(dt.utcnow(), self.START_DATE_FORMAT),  # set to utc today
         }
 
     def select_all_streams_and_fields(self, conn_id, catalogs, select_all_fields: bool = True):
@@ -166,7 +103,7 @@ class TestTrelloCustomFields(unittest.TestCase):
         for record in expected_records_cfields:
             if all(v for _, v in fields_exist.items()):
                 break
-            value = record.get('value')            
+            value = record.get('value')
             if value:
                 key = next(iter(value))
                 if key in self.expected_custom_fields() and not fields_exist.get(key):
@@ -230,13 +167,17 @@ class TestTrelloCustomFields(unittest.TestCase):
         # Verify target has records for all synced streams
         for stream, count in first_record_count_by_stream.items():
             assert stream in self.expected_sync_streams()
+            if stream in self.untestable_streams():
+                if count == 0:
+                    print(f"SKIPPING: No data for untestable stream: {stream}")
+                    continue
             self.assertGreater(count, 0, msg="failed to replicate any data for: {}".format(stream))
         print("total replicated row count: {}".format(replicated_row_count))
 
         # Testing streams with custom fields
         for stream in self.testable_streams():
             with self.subTest(stream=stream):
-                
+
                 data = synced_records.get(stream)
                 record_messages = [row['data'] for row in data['messages']]
                 record_ids = [message.get('id') for message in record_messages]
@@ -255,7 +196,7 @@ class TestTrelloCustomFields(unittest.TestCase):
                         self.assertIn(
                             card.get('id'), records_ids,
                             msg="Missing a record that has custom fields:\n{}".format(card.get('id'))
-                        ) 
+                        )
 
                 # Verify that we replicated the expected custom fields on those records
                 for expected_cfield in expected_records_cfields:

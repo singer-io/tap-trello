@@ -12,15 +12,26 @@ from time import sleep
 
 
 PARENT_OBJECTS = []
+CURRENT_PARENT_STREAM = None
 LIST_OBJECTS = []
 NEVER_DELETE_BOARD_ID = "5eb080e9d9e0f56e8311ab5f"
 PARENT_STREAM = {
-    'actions': 'boards',
-    'boards': 'boards',
-    'lists': 'boards',
-    'cards': 'boards',
-    'checklists': 'boards',
-    'users': 'boards'
+        'actions': 'boards',
+        'boards': 'boards',
+        'board_memberships': 'boards',
+        'board_custom_fields': 'boards',
+        'board_labels': 'boards',
+        'cards': 'boards',
+        'card_attachments': 'cards',
+        'card_custom_field_items': 'cards',
+        'checklists': 'boards',
+        'lists': 'boards',
+        'members': 'users',
+        'organizations': 'organizations',
+        'organization_actions': 'organizations',
+        'organization_members': 'organizations',
+        'organization_memberships': 'organizations',
+        'users': 'boards'
 }
 MAX_API_LIMIT = 1000 # this is the smallest
 # MAX_API_LIMIT = {
@@ -33,9 +44,19 @@ MAX_API_LIMIT = 1000 # this is the smallest
 REPLICATION_METHOD = {
     'actions': 'INCREMENTAL',
     'boards': 'FULL_TABLE',
+    'board_memberships': 'FULL_TABLE',
+    'board_custom_fields': 'FULL_TABLE',
+    'board_labels': 'FULL_TABLE',
     'cards': 'FULL_TABLE',
+    'card_attachments': 'FULL_TABLE',
+    'card_custom_field_items': 'FULL_TABLE',
     'checklists': 'FULL_TABLE',
     'lists': 'FULL_TABLE',
+    'members': 'FULL_TABLE',
+    'organizations': 'FULL_TABLE',
+    'organization_actions': 'INCREMENTAL',
+    'organization_members': 'FULL_TABLE',
+    'organization_memberships': 'FULL_TABLE',
     'users': 'FULL_TABLE'
 }
 TEST_USERS = {
@@ -56,7 +77,7 @@ PARAMS = (
 )
 
 ##########################################################################
-### Utils for retrieving existing test data 
+### Utils for retrieving existing test data
 ##########################################################################
 def get_replication_method(stream):
     if stream in REPLICATION_METHOD.keys():
@@ -107,6 +128,22 @@ def get_objects(obj_type: str, obj_id: str = "", parent_id: str = "", since = No
 
     if obj_type == 'cards':
         return get_objects_cards(obj_id=obj_id, parent_id=parent_id, since=since, custom_fields=custom_fields)
+
+    # members API returns single object, not a list
+    if obj_type == 'members':
+        endpoint = get_url_string("get", obj_type, obj_id, parent_id)
+        parameters = PARAMS
+
+        print(" * Test Data |  Request: GET on {}, with parameters: {}".format(endpoint, [p for p in parameters if p[0] not in ["key", "token"]]))
+
+        resp = requests.get(url=endpoint, headers=HEADERS, params=parameters)
+        if resp.status_code >= 400:
+            logging.warn("Request Failed {} \n    {}".format(resp.status_code, resp.text))
+            return None
+
+        # API returns a single object, wrap it in a list
+        member_obj = resp.json()
+        return [member_obj] if isinstance(member_obj, dict) else member_obj
 
     endpoint = get_url_string("get", obj_type, obj_id, parent_id)
     parameters = PARAMS
@@ -175,7 +212,8 @@ def get_objects_cards(obj_type="cards", obj_id: str = "", parent_id: str = "", s
 
 def get_random_object_id(obj_type: str, parent_id: str = ""):
     """Return the id of a random object for a specified object_type"""
-    global PARENT_OBJECTS  #, LIST_OBJECTS
+    # Note: Do NOT use global PARENT_OBJECTS here, as it may contain the wrong parent type
+    # Always fetch fresh objects to ensure correct parent type
 
     if obj_type == 'users':
         user_ids = [user.get('id') for user in TEST_USERS.values()]
@@ -192,23 +230,13 @@ def get_random_object_id(obj_type: str, parent_id: str = ""):
         objects = get_objects(obj_type, parent_id=parent_id)
         random_object = objects[random.randint(0, len(objects) -1)]
         return random_object.get('id')
-        
 
-    elif obj_type == get_parent_stream(obj_type): # if boards
-        if not PARENT_OBJECTS: # if we have not already done a get on baords
-            PARENT_OBJECTS = get_objects(obj_type)
-
-        objects = PARENT_OBJECTS
-        random_object = objects[random.randint(0, len(objects) -1)]
-
-        return random_object.get('id')
-
-    # elif obj_type == 'lists':
-    # if not LIST_OBJECTS: # if we have not already done a get on baords
-        #     LIST_OBJECTS = get_objects(obj_type)
-        # objects = LIST_OBJECTS
-
+    # For top-level streams (boards, organizations), always fetch fresh to avoid using wrong parent type
     objects = get_objects(obj_type)
+    if objects is None or len(objects) == 0:
+        raise Exception(
+            f"No objects found for type '{obj_type}' when trying to get random object ID."
+        )
     random_object = objects[random.randint(0, len(objects) -1)]
 
     return random_object.get('id')
@@ -221,13 +249,13 @@ def get_url_string(req: str, obj_type: str, obj_id: str = "", parent_id: str = "
      :param obj_id: The specific id of a record in the stream you are making a request on.
      :param parent_id: The specific id of a record that is the parent of the stream you are making a request on.
                        If you do not specific a parent id, a random one will be selected if needed
-    eg. 
-    Get all actions for a given baord:
+    eg.
+    Get all actions for a given board:
         get_url_string(req='get', obj_type='actions', obj_id='', parent_id=<id-of-a-specific-board>)
     Create a card anywhere:
         get_url_string(req='post', obj_type='cards', obj_id='', parent_id='')
     """
-    
+
     url_string = BASE_URL
 
     if obj_type == 'boards': # TODO may need to parameterize a members parent obj here
@@ -269,6 +297,66 @@ def get_url_string(req: str, obj_type: str, obj_id: str = "", parent_id: str = "
             url_string += "/boards/{}/lists".format(parent_id)
         else:
             url_string += "/lists/{}".format(obj_id)
+    elif obj_type == 'board_memberships':
+        if req == 'get':
+            url_string += "/boards/{}/memberships".format(parent_id)
+        else:
+            url_string += "/boards/{}/memberships/{}".format(parent_id, obj_id)
+
+    elif obj_type == 'board_custom_fields':
+        if req == 'get':
+            url_string += "/boards/{}/customFields".format(parent_id)
+        else:
+            url_string += "/boards/{}/customFields/{}".format(parent_id, obj_id)
+
+    elif obj_type == 'board_labels':
+        if req == 'get':
+            url_string += "/boards/{}/labels".format(parent_id)
+        else:
+            url_string += "/boards/{}/labels/{}".format(parent_id, obj_id)
+
+    elif obj_type == 'card_attachments':
+        if req == 'get':
+            url_string += "/cards/{}/attachments".format(parent_id)
+        else:
+            url_string += "/cards/{}/attachments/{}".format(parent_id, obj_id)
+
+    elif obj_type == 'card_custom_field_items':
+        if req == 'get':
+            url_string += "/cards/{}/customFieldItems".format(parent_id)
+        else:
+            url_string += "/cards/{}/customFieldItems/{}".format(parent_id, obj_id)
+
+    elif obj_type == 'members':
+        if obj_id:
+            url_string += "/members/{}".format(obj_id)
+        else:
+            url_string += "/members/{}".format(parent_id)
+
+    elif obj_type == 'organizations':
+        if req == "get":
+            url_string += "/members/me/organizations/{}".format(obj_id)
+        else:
+            url_string += "/organizations/{}".format(obj_id)
+
+    elif obj_type == 'organization_actions':
+        if req == 'get':
+            url_string += "/organizations/{}/actions".format(parent_id) if not obj_id else "/organizations/{}/actions/{}".format(parent_id, obj_id)
+        else:
+            url_string += "/organizations/{}/actions/{}".format(parent_id, obj_id)
+
+    elif obj_type == 'organization_members':
+        if req == 'get':
+            url_string += "/organizations/{}/members".format(parent_id)
+        else:
+            url_string += "/organizations/{}/members/{}".format(parent_id, obj_id)
+
+    elif obj_type == 'organization_memberships':
+        if req == 'get':
+            url_string += "/organizations/{}/memberships".format(parent_id)
+        else:
+            url_string += "/organizations/{}/memberships/{}".format(parent_id, obj_id)
+
     else:
         raise NotImplementedError
 
@@ -277,15 +365,27 @@ def get_url_string(req: str, obj_type: str, obj_id: str = "", parent_id: str = "
 
 def get_total_record_count_and_objects(child_stream: str="", since = None):
     """
-    : param child_stream: 
+    : param child_stream:
     Return the count and all records of a given child stream
     """
-    global PARENT_OBJECTS
+    global PARENT_OBJECTS, CURRENT_PARENT_STREAM
 
     parent_stream = get_parent_stream(child_stream)
 
+    # Reset PARENT_OBJECTS if we're switching to a different parent stream type
+    if CURRENT_PARENT_STREAM != parent_stream:
+        print(f" * Test Data | Switching parent stream from '{CURRENT_PARENT_STREAM}' to '{parent_stream}' for child stream '{child_stream}'")
+        PARENT_OBJECTS = []
+        CURRENT_PARENT_STREAM = parent_stream
+
     if not PARENT_OBJECTS:
+        print(f" * Test Data | Loading parent objects for parent stream '{parent_stream}'")
         PARENT_OBJECTS = get_objects(obj_type=parent_stream, since=since)
+
+        if PARENT_OBJECTS is None:
+            raise Exception(f"Failed to fetch parent objects for stream '{parent_stream}'.")
+
+        print(f" * Test Data | Loaded {len(PARENT_OBJECTS)} parent objects of type '{parent_stream}'")
 
     # If true, then this stream is top level so just need 1 get ^
     if parent_stream == child_stream:
@@ -295,6 +395,10 @@ def get_total_record_count_and_objects(child_stream: str="", since = None):
     existing_objects = []
     for obj in PARENT_OBJECTS:
         objects = get_objects(obj_type=child_stream, parent_id=obj.get('id'), since=since)
+
+        if objects is None:
+            raise Exception(f"Failed to fetch child objects for stream '{child_stream}' with parent_id '{obj.get('id')}' (parent_stream='{parent_stream}').")
+
         for obj in objects:
             already_tracked = False
             for e_obj in existing_objects:
@@ -336,7 +440,7 @@ def get_test_data():
             "prefs_background": "blue",  # id of  background or oneof: blue, orange, green, red, purple, pink, lime, sky, grey
             "prefs_cardAging": "regular", # type of card aging on the board (if enabled) One of: pirate, regular. Default: regular
         },
-        "USERS": {"type": ""},  # {"fullName":"xae a12","username":"singersongwriterd42"} # TODO 
+        "USERS": {"type": ""},  # {"fullName":"xae a12","username":"singersongwriterd42"} # TODO
         "CARDS": {
             "name":"Card {}".format(tstamp),
             "desc": "This is a description.",
@@ -378,7 +482,7 @@ def update_object(obj_type: str, obj_id: str = '', parent_id: str = '', field_to
     update an existing object in order to genereate a new 'actions' record
     """
     print(" * Test Data | Request: PUT on /{}/".format(obj_type))
-    
+
     if not obj_id:
         obj_id = get_random_object_id(obj_type)
 
@@ -521,7 +625,7 @@ def create_object_actions(recipient_stream: str = "boards", obj_id: str = "", ac
             while not obj_id or (obj_id == NEVER_DELETE_BOARD_ID) and attempts < 50:
                 obj_id = get_random_object_id(recipient_stream)
                 attempts += 1
-                
+
             if obj_id == NEVER_DELETE_BOARD_ID:
                 logging.warn("Request Ignored |  You tried to change a board that other tests rely on |  " +\
                              "Board (id={}) should not be altered".format(NEVER_DELETE_BOARD_ID))
@@ -532,7 +636,7 @@ def create_object_actions(recipient_stream: str = "boards", obj_id: str = "", ac
 
     pot_fields_to_update = get_action_fields_by_stream().get(recipient_stream)
     field_to_update = pot_fields_to_update[random.randint(0, len(pot_fields_to_update) - 1)]
-    
+
     data = stream_to_data_mapping(recipient_stream)
     if data:
         if action_type == "comment":
@@ -656,6 +760,25 @@ def create_object(obj_type, obj_id: str = "", parent_id: str = "",
 
     return that object or none if create fails
     """
+    uncreatable_streams = {
+        'board_memberships': 'Board memberships are created when users join boards',
+        'board_custom_fields': 'Custom fields cannot be easily created via API for testing',
+        'board_labels': 'Board labels are auto-generated when board is created',
+        'card_attachments': 'Card attachments require file upload which is complex for testing',
+        'card_custom_field_items': 'Custom field items require custom field setup',
+        'members': 'Members stream represents user memberships, not creatable',
+        'organization_actions': 'Actions are generated by updates to organizations',
+        'organization_members': 'Organization members are read-only, managed via memberships',
+        'organization_memberships': 'Organization memberships cannot be easily created for testing',
+        'checklists': 'Checklists require parent cards to be properly set up'
+    }
+
+    if obj_type in uncreatable_streams:
+        print(" * Test Data | SKIPPING CREATE for {}: {}".format(obj_type, uncreatable_streams[obj_type]))
+        logging.info("Stream {} cannot be created directly via test utilities: {}".format(
+            obj_type, uncreatable_streams[obj_type]))
+        return None
+
     if obj_type == 'actions':
         print(" * Test Data | DIRECT CREATES ARE UNAVAILABLE for {}. ".format(obj_type) +\
               "UPDATING another stream to generate new record")
@@ -678,6 +801,11 @@ def create_object(obj_type, obj_id: str = "", parent_id: str = "",
     elif obj_type == 'users':
         print(" * Test Data | CREATES ARE UNAVAILABLE for {}".format(obj_type))
         return update_object_user(obj_id=obj_id, parent_id=parent_id,)
+
+    elif obj_type == 'organizations':
+        print(" * Test Data | SKIPPING CREATE for {}: Organizations already exist in test account".format(obj_type))
+        logging.info("Stream {} uses existing organizations from test account".format(obj_type))
+        return None
 
     print(" * Test Data | Request: POST on /{}/".format(obj_type))
 
@@ -721,11 +849,12 @@ def delete_object(obj_type, obj_id: str = "", parent_id: str = ""):
     return resp.json()
 
 def reset_tracked_parent_objects():  # TODO Reset all tracked data if we end up tracking child streams
-    global PARENT_OBJECTS
-    PARENT_OBJECTS = ""
+    global PARENT_OBJECTS, CURRENT_PARENT_STREAM
+    PARENT_OBJECTS = []
+    CURRENT_PARENT_STREAM = None
     print(" * Test Data | RESETTING TRACKED PARENT OBJECTS")
     return
-    
+
 ##########################################################################
 ### Methods for custom fields
 ##########################################################################
