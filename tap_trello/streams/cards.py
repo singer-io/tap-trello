@@ -1,12 +1,12 @@
 import singer
 
-from tap_trello.streams.abstracts import AddCustomFields, ChildStream
+from tap_trello.streams.abstracts import ChildStream
 from tap_trello.streams.boards import Boards
 
 LOGGER = singer.get_logger()
 
 
-class Cards(AddCustomFields, ChildStream):
+class Cards(ChildStream):
     stream_id = "cards"
     stream_name = "cards"
     endpoint = "/boards/{}/cards/all"
@@ -14,6 +14,41 @@ class Cards(AddCustomFields, ChildStream):
     replication_method = "FULL_TABLE"
     parent = Boards
     MAX_API_RESPONSE_SIZE = 1000
+
+    def _get_dropdown_option_key(self, field_id, option_id):
+        """Generate a unique key for dropdown options."""
+        return field_id + '_' + option_id
+
+    def build_custom_fields_maps(self, **kwargs):
+        """Build maps of custom field IDs to names and dropdown option IDs to values."""
+        custom_fields_map = {}
+        dropdown_options_map = {}
+        board_id_list = kwargs['parent_id_list']
+        # The custom fields are defined on the board level, so this function is called on a per-board basis
+        # Therefore, we validate that only one board is being passed in
+        if len(board_id_list) != 1:
+            raise ValueError(f"Expected exactly one board ID, got {len(board_id_list)}")
+        custom_fields = self.client.get('/boards/{}/customFields'.format(board_id_list[0]))
+        for custom_field in custom_fields:
+            custom_fields_map[custom_field['id']] = custom_field['name']
+            if custom_field['type'] == 'list':
+                for dropdown_option in custom_field['options']:
+                    dropdown_option_key = self._get_dropdown_option_key(dropdown_option['idCustomField'], dropdown_option['id'])
+                    dropdown_options_map[dropdown_option_key] = dropdown_option['value']['text']
+
+        return custom_fields_map, dropdown_options_map
+
+    def modify_record(self, record, **kwargs):
+        """Add custom field names and dropdown values to card records."""
+        custom_fields_map = kwargs['custom_fields_map']
+        dropdown_options_map = kwargs['dropdown_options_map']
+        for custom_field in record['customFieldItems']:
+            custom_field['name'] = custom_fields_map[custom_field['idCustomField']]
+            if custom_field.get('idValue', None):
+                dropdown_option_key = self._get_dropdown_option_key(custom_field['idCustomField'], custom_field['idValue'])
+                custom_field['value'] = {'option': dropdown_options_map[dropdown_option_key]}
+
+        return record
 
     def get_records(self, format_values, additional_params=None):
         # Get max_api_response_size from config and set to parameter
