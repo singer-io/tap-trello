@@ -1,6 +1,8 @@
-import sys
 import json
+import sys
+
 import singer
+
 from tap_trello.client import Client
 from tap_trello.discover import discover
 from tap_trello.sync import sync
@@ -8,6 +10,7 @@ from tap_trello.sync import sync
 LOGGER = singer.get_logger()
 
 REQUIRED_CONFIG_KEYS = ['consumer_key', 'consumer_secret', 'access_token', 'access_token_secret', 'start_date']
+
 
 def do_discover():
     """
@@ -42,4 +45,3 @@ def main():
 
 if __name__ == "__main__":
     main()
-

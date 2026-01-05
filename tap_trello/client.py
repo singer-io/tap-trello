@@ -3,10 +3,12 @@ from typing import Any, Dict, Mapping, Optional, Tuple
 import backoff
 import requests
 from requests import session
-from requests.exceptions import Timeout, ConnectionError, ChunkedEncodingError
+from requests.exceptions import ChunkedEncodingError, ConnectionError, Timeout
 from singer import get_logger, metrics
 
-from tap_trello.exceptions import ERROR_CODE_EXCEPTION_MAPPING, TrelloError, TrelloBackoffError
+from tap_trello.exceptions import (ERROR_CODE_EXCEPTION_MAPPING,
+                                   TrelloError,
+                                   TrelloBackoffError)
 
 LOGGER = get_logger()
 REQUEST_TIMEOUT = 300
@@ -34,6 +36,7 @@ def raise_for_error(response: requests.Response) -> None:
             "raise_exception", TrelloError
         )
         raise exc(message, response) from None
+
 
 class Client:
     """
@@ -119,4 +122,3 @@ class Client:
                 raise ValueError(f"Unsupported method: {method}")
 
         return response.json()
-

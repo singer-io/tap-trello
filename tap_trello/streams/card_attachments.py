@@ -6,4 +6,3 @@ class CardAttachments(FullTableStream):
     replication_method = "FULL_TABLE"
     path = "/cards/{id}/attachments"
     parent = "cards"
-

@@ -5,4 +5,3 @@ class Organizations(FullTableStream):
     key_properties = ["id"]
     replication_method = "FULL_TABLE"
     path = "/organizations/{id}"
-

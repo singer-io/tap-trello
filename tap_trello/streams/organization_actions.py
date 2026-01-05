@@ -8,4 +8,3 @@ class OrganizationActions(ChildBaseStream):
     path = "/organizations/{id}/actions"
     parent = "organizations"
     bookmark_value = None
-

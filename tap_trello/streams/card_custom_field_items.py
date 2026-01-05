@@ -6,4 +6,3 @@ class CardCustomFieldItems(FullTableStream):
     replication_method = "FULL_TABLE"
     path = "/cards/{id}/customFieldItems"
     parent = "cards"
-

@@ -1,1 +1,46 @@
-{}
+{
+    "type": "object",
+    "properties": {
+        "id": {
+            "type": [
+                "string"
+            ]
+        },
+        "organization_id": {
+            "type": [
+                "string"
+            ]
+        },
+        "idMember": {
+            "type": [
+                "null",
+                "string"
+            ]
+        },
+        "memberType": {
+            "type": [
+                "null",
+                "string"
+            ]
+        },
+        "unconfirmed": {
+            "type": [
+                "null",
+                "boolean"
+            ]
+        },
+        "deactivated": {
+            "type": [
+                "null",
+                "boolean"
+            ]
+        },
+        "lastActive": {
+            "type": [
+                "null",
+                "string"
+            ],
+            "format": "date-time"
+        }
+    }
+}

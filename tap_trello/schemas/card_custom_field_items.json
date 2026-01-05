@@ -1,1 +1,44 @@
-{}
+{
+    "type": "object",
+    "properties": {
+        "id": {
+            "type": [
+                "string"
+            ]
+        },
+        "card_id": {
+            "type": [
+                "string"
+            ]
+        },
+        "value": {
+            "type": "object",
+            "properties": {
+                "checked": {
+                    "type": [
+                        "null",
+                        "string"
+                    ]
+                }
+            }
+        },
+        "idCustomField": {
+            "type": [
+                "null",
+                "string"
+            ]
+        },
+        "idModel": {
+            "type": [
+                "null",
+                "string"
+            ]
+        },
+        "modelType": {
+            "type": [
+                "null",
+                "string"
+            ]
+        }
+    }
+}

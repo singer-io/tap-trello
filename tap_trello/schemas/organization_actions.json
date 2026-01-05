@@ -1,1 +1,409 @@
-{}
+{
+    "type": "object",
+    "properties": {
+        "id": {
+            "type": [
+                "string"
+            ]
+        },
+        "organization_id": {
+            "type": [
+                "string"
+            ]
+        },
+        "idMemberCreator": {
+            "type": [
+                "null",
+                "string"
+            ]
+        },
+        "data": {
+            "type": [
+                "null",
+                "object"
+            ],
+            "properties": {
+                "text": {
+                    "type": [
+                        "null",
+                        "string"
+                    ]
+                },
+                "card": {
+                    "type": [
+                        "null",
+                        "object"
+                    ],
+                    "properties": {
+                        "id": {
+                            "type": [
+                                "null",
+                                "string"
+                            ]
+                        },
+                        "name": {
+                            "type": [
+                                "null",
+                                "string"
+                            ]
+                        },
+                        "idShort": {
+                            "type": [
+                                "null",
+                                "integer"
+                            ]
+                        },
+                        "shortLink": {
+                            "type": [
+                                "null",
+                                "string"
+                            ]
+                        }
+                    },
+                    "additionalProperties": true
+                },
+                "board": {
+                    "type": [
+                        "null",
+                        "object"
+                    ],
+                    "properties": {
+                        "id": {
+                            "type": [
+                                "null",
+                                "string"
+                            ]
+                        },
+                        "name": {
+                            "type": [
+                                "null",
+                                "string"
+                            ]
+                        },
+                        "shortLink": {
+                            "type": [
+                                "null",
+                                "string"
+                            ]
+                        }
+                    },
+                    "additionalProperties": true
+                },
+                "list": {
+                    "type": [
+                        "null",
+                        "object"
+                    ],
+                    "properties": {
+                        "id": {
+                            "type": [
+                                "null",
+                                "string"
+                            ]
+                        },
+                        "name": {
+                            "type": [
+                                "null",
+                                "string"
+                            ]
+                        }
+                    },
+                    "additionalProperties": true
+                }
+            },
+            "additionalProperties": true
+        },
+        "type": {
+            "type": [
+                "null",
+                "string"
+            ]
+        },
+        "date": {
+            "type": [
+                "null",
+                "string"
+            ],
+            "format": "date-time"
+        },
+        "limits": {
+            "type": [
+                "null",
+                "object"
+            ],
+            "properties": {
+                "reactions": {
+                    "type": [
+                        "null",
+                        "object"
+                    ],
+                    "properties": {
+                        "perAction": {
+                            "type": [
+                                "null",
+                                "object"
+                            ],
+                            "properties": {
+                                "status": {
+                                    "type": [
+                                        "null",
+                                        "string"
+                                    ]
+                                },
+                                "disableAt": {
+                                    "type": [
+                                        "null",
+                                        "integer"
+                                    ]
+                                },
+                                "warnAt": {
+                                    "type": [
+                                        "null",
+                                        "integer"
+                                    ]
+                                }
+                            },
+                            "additionalProperties": true
+                        },
+                        "uniquePerAction": {
+                            "type": [
+                                "null",
+                                "object"
+                            ],
+                            "properties": {
+                                "status": {
+                                    "type": [
+                                        "null",
+                                        "string"
+                                    ]
+                                },
+                                "disableAt": {
+                                    "type": [
+                                        "null",
+                                        "integer"
+                                    ]
+                                },
+                                "warnAt": {
+                                    "type": [
+                                        "null",
+                                        "integer"
+                                    ]
+                                }
+                            },
+                            "additionalProperties": true
+                        }
+                    },
+                    "additionalProperties": true
+                }
+            },
+            "additionalProperties": true
+        },
+        "display": {
+            "type": [
+                "null",
+                "object"
+            ],
+            "properties": {
+                "translationKey": {
+                    "type": [
+                        "null",
+                        "string"
+                    ]
+                },
+                "entities": {
+                    "type": [
+                        "null",
+                        "object"
+                    ],
+                    "properties": {
+                        "contextOn": {
+                            "type": [
+                                "null",
+                                "object"
+                            ],
+                            "properties": {
+                                "type": {
+                                    "type": [
+                                        "null",
+                                        "string"
+                                    ]
+                                },
+                                "translationKey": {
+                                    "type": [
+                                        "null",
+                                        "string"
+                                    ]
+                                },
+                                "hideIfContext": {
+                                    "type": [
+                                        "null",
+                                        "boolean"
+                                    ]
+                                },
+                                "idContext": {
+                                    "type": [
+                                        "null",
+                                        "string"
+                                    ]
+                                }
+                            },
+                            "additionalProperties": true
+                        },
+                        "card": {
+                            "type": [
+                                "null",
+                                "object"
+                            ],
+                            "properties": {
+                                "type": {
+                                    "type": [
+                                        "null",
+                                        "string"
+                                    ]
+                                },
+                                "hideIfContext": {
+                                    "type": [
+                                        "null",
+                                        "boolean"
+                                    ]
+                                },
+                                "id": {
+                                    "type": [
+                                        "null",
+                                        "string"
+                                    ]
+                                },
+                                "shortLink": {
+                                    "type": [
+                                        "null",
+                                        "string"
+                                    ]
+                                },
+                                "text": {
+                                    "type": [
+                                        "null",
+                                        "string"
+                                    ]
+                                }
+                            },
+                            "additionalProperties": true
+                        },
+                        "comment": {
+                            "type": [
+                                "null",
+                                "object"
+                            ],
+                            "properties": {
+                                "type": {
+                                    "type": [
+                                        "null",
+                                        "string"
+                                    ]
+                                },
+                                "text": {
+                                    "type": [
+                                        "null",
+                                        "string"
+                                    ]
+                                }
+                            },
+                            "additionalProperties": true
+                        },
+                        "memberCreator": {
+                            "type": [
+                                "null",
+                                "object"
+                            ],
+                            "properties": {
+                                "type": {
+                                    "type": [
+                                        "null",
+                                        "string"
+                                    ]
+                                },
+                                "id": {
+                                    "type": [
+                                        "null",
+                                        "string"
+                                    ]
+                                },
+                                "username": {
+                                    "type": [
+                                        "null",
+                                        "string"
+                                    ]
+                                },
+                                "text": {
+                                    "type": [
+                                        "null",
+                                        "string"
+                                    ]
+                                }
+                            },
+                            "additionalProperties": true
+                        }
+                    },
+                    "additionalProperties": true
+                }
+            },
+            "additionalProperties": true
+        },
+        "memberCreator": {
+            "type": [
+                "null",
+                "object"
+            ],
+            "properties": {
+                "id": {
+                    "type": [
+                        "null",
+                        "string"
+                    ]
+                },
+                "activityBlocked": {
+                    "type": [
+                        "null",
+                        "boolean"
+                    ]
+                },
+                "avatarHash": {
+                    "type": [
+                        "null",
+                        "string"
+                    ]
+                },
+                "avatarUrl": {
+                    "type": [
+                        "null",
+                        "string"
+                    ]
+                },
+                "fullName": {
+                    "type": [
+                        "null",
+                        "string"
+                    ]
+                },
+                "idMemberReferrer": {
+                    "type": [
+                        "null",
+                        "string"
+                    ]
+                },
+                "initials": {
+                    "type": [
+                        "null",
+                        "string"
+                    ]
+                },
+                "username": {
+                    "type": [
+                        "null",
+                        "string"
+                    ]
+                }
+            },
+            "additionalProperties": true
+        }
+    }
+}

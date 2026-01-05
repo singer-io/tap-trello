@@ -1,1 +1,115 @@
-{}
+{
+    "type": "object",
+    "properties": {
+        "id": {
+            "type": [
+                "string"
+            ]
+        },
+        "name": {
+            "type": [
+                "null",
+                "string"
+            ]
+        },
+        "displayName": {
+            "type": [
+                "null",
+                "string"
+            ]
+        },
+        "dateLastActivity": {
+            "type": [
+                "null",
+                "string"
+            ],
+            "format": "date-time"
+        },
+        "prefs": {
+            "type": "object",
+            "properties": {
+                "boardVisibilityRestrict": {
+                    "type": "object",
+                    "additionalProperties": true
+                },
+                "boardDeleteRestrict": {
+                    "type": "object",
+                    "additionalProperties": true
+                },
+                "attachmentRestrictions": {
+                    "type": [
+                        "null",
+                        "array"
+                    ],
+                    "items": {
+                        "type": [
+                            "null",
+                            "string"
+                        ]
+                    }
+                },
+                "permissionLevel": {
+                    "type": [
+                        "null",
+                        "string"
+                    ]
+                }
+            },
+            "additionalProperties": true
+        },
+        "idEnterprise": {
+            "type": [
+                "null",
+                "string"
+            ]
+        },
+        "offering": {
+            "type": [
+                "null",
+                "string"
+            ]
+        },
+        "url": {
+            "type": [
+                "null",
+                "string"
+            ]
+        },
+        "idBoards": {
+            "type": [
+                "null",
+                "array"
+            ],
+            "items": {
+                "type": [
+                    "null",
+                    "string"
+                ]
+            }
+        },
+        "memberships": {
+            "type": [
+                "null",
+                "array"
+            ],
+            "items": {
+                "type": [
+                    "null",
+                    "string"
+                ]
+            }
+        },
+        "premiumFeatures": {
+            "type": [
+                "null",
+                "array"
+            ],
+            "items": {
+                "type": [
+                    "null",
+                    "string"
+                ]
+            }
+        }
+    }
+}

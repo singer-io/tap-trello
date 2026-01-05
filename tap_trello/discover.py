@@ -1,6 +1,7 @@
 import singer
 from singer import metadata
 from singer.catalog import Catalog, CatalogEntry, Schema
+
 from tap_trello.schema import get_schemas
 
 LOGGER = singer.get_logger()
@@ -36,4 +37,3 @@ def discover() -> Catalog:
         )
 
     return catalog
-
