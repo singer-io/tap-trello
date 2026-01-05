@@ -17,8 +17,8 @@ class Cards(AddCustomFields, ChildStream):
 
     def get_records(self, format_values, additional_params=None):
         # Get max_api_response_size from config and set to parameter
-        cards_response_size = self.config.get('cards_response_size')
-        self.MAX_API_RESPONSE_SIZE = int(cards_response_size) if cards_response_size else self.MAX_API_RESPONSE_SIZE
+        cards_response_size = int(self.config.get('cards_response_size') or self.MAX_API_RESPONSE_SIZE)
+        self.MAX_API_RESPONSE_SIZE = min(cards_response_size, 1000)
         self.params = {'limit': self.MAX_API_RESPONSE_SIZE, 'customFieldItems': 'true'}
 
         # Set window_end with current time
@@ -27,20 +27,13 @@ class Cards(AddCustomFields, ChildStream):
         # Build custom fields and dropdown object map for the specific parent
         custom_fields_map, dropdown_options_map = self.build_custom_fields_maps(parent_id_list=format_values)
 
-        while True:
+        has_more_pages = True
+        while has_more_pages:
 
             # Get records for cards before specified time
             # Reference: https://developer.atlassian.com/cloud/trello/guides/rest-api/api-introduction/#paging
             records = self.client.get(self._format_endpoint(format_values), params={"before": window_end,
                                                                                    **self.params})
-
-            # Raise exception if API returns more data than specified limit
-            if self.MAX_API_RESPONSE_SIZE and len(records) > self.MAX_API_RESPONSE_SIZE:
-                raise Exception(
-                    ("{}: Number of records returned is greater than the requested API response size of {}.").format(
-                        self.stream_id,
-                        self.MAX_API_RESPONSE_SIZE)
-                )
 
             # Yielding records after adding custom fields and dropdown object map to all records
             for rec in records:
@@ -58,5 +51,5 @@ class Cards(AddCustomFields, ChildStream):
                 # API returns latest records so set window_end to smallest card id to get older data
                 window_end = records[0]["id"]
             else:
-                # API returns less records than limit, break the pagination
-                break
+                # API returns less records than limit, stop pagination
+                has_more_pages = False

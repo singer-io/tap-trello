@@ -62,6 +62,5 @@
                 "string"
             ]
         }
-    },
-    "required": ["id", "card_id"]
+    }
 }
