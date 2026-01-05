@@ -3,13 +3,11 @@
     "properties": {
         "id": {
             "type": [
-                "null",
                 "string"
             ]
         },
         "organization_id": {
             "type": [
-                "null",
                 "string"
             ]
         },

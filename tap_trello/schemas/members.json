@@ -3,13 +3,6 @@
     "properties": {
         "id": {
             "type": [
-                "null",
-                "string"
-            ]
-        },
-        "boardId": {
-            "type": [
-                "null",
                 "string"
             ]
         },
@@ -44,10 +37,16 @@
             ]
         },
         "bioData": {
-            "type": "object",
+            "type": [
+                "null",
+                "object"
+            ],
             "properties": {
                 "emoji": {
-                    "type": "object",
+                    "type": [
+                        "null",
+                        "object"
+                    ],
                     "properties": {}
                 }
             },
@@ -300,7 +299,10 @@
             }
         },
         "marketingOptIn": {
-            "type": "object",
+            "type": [
+                "null",
+                "object"
+            ],
             "properties": {
                 "optedIn": {
                     "type": [
@@ -379,7 +381,10 @@
             ]
         },
         "prefs": {
-            "type": "object",
+            "type": [
+                "null",
+                "object"
+            ],
             "properties": {
                 "sendSummaries": {
                     "type": [
@@ -488,8 +493,5 @@
                 "type": "string"
             }
         }
-    },
-    "required": [
-        "id"
-    ]
+    }
 }

@@ -5,10 +5,9 @@
   ],
   "properties": {
     "id": {
-      "type": [
-        "null",
-        "string"
-      ]
+          "type": [
+            "string"
+          ]
     },
     "idMemberCreator": {
       "type": [
