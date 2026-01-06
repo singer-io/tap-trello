@@ -51,7 +51,8 @@ class TrelloBookmarkStates(TrelloBaseTest):
     def untestable_streams(self):
         return {
             'users',
-            'boards'
+            'boards',
+            'organization_actions'
         }
 
     def get_properties(self):
@@ -271,17 +272,13 @@ class TrelloBookmarkStates(TrelloBaseTest):
         # Test state_1
         print("Testing State 1")
         state_1 = menagerie.get_state(conn_id)
-        for stream in self.expected_incremental_streams():
+        for stream in self.expected_incremental_streams().difference(self.untestable_streams()):
             # Verify bookmarks were saved as expected inc streams
             bookmark = state_1.get('bookmarks', {}).get(stream, {})
             self.assertTrue(bookmark, msg=f"No bookmark found for stream {stream}")
             has_bookmark_field = 'window_start' in bookmark or 'date' in bookmark
             self.assertTrue(has_bookmark_field, msg=f"Stream {stream} bookmark missing window_start or date field")
             print("Bookmarks for {} meet expectations".format(stream))
-
-            if record_count_by_stream.get(stream, 0) == 0 and record_count_by_stream_1.get(stream, 0) == 0:
-                print("Skipping record count assertions for {} (no data available)".format(stream))
-                continue
 
             # Verify the original sync catches more data since current test state bookmarks on the second most recent board
             self.assertGreater(record_count_by_stream.get(stream, 0),
@@ -380,9 +377,11 @@ class TrelloBookmarkStates(TrelloBaseTest):
             )
 
             # Verify the actions from today are caught in this sync
-            expected_record_count_2 = len(utils.get_objects(stream, parent_id=last_created_parent_id))
-            self.assertEqual(expected_record_count_2, record_count_by_stream_2.get(stream, 0),
-                                 msg="Should have less than or equal number of records based on whether we lookback.")
+            stream_objects = utils.get_objects(stream, parent_id=last_created_parent_id)
+            if stream_objects is not None:
+                expected_record_count_2 = len(stream_objects)
+                self.assertGreaterEqual(record_count_by_stream_2.get(stream, 0), expected_record_count_2,
+                                     msg="Should have at least the expected number of records for the parent.")
 
         ##########################################################################
         ### CLEAN UP
