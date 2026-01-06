@@ -97,7 +97,7 @@ def get_parent_stream(stream):
 
 def get_objects_users(obj_type: str='users', obj_id: str = "", parent_id: str = ""):
     """Get all members on a specific parent object, add that parent obj_id to the returned resp."""
-    print(" * Test Data |  Request: GET on /{}/{}".format(obj_type, obj_id))
+    logging.info(" * Test Data |  Request: GET on /{}/{}".format(obj_type, obj_id))
 
     if not parent_id: # needs to execute here so we can grab the board_id for the ret_val
         parent_id = get_random_object_id('boards')
@@ -106,11 +106,11 @@ def get_objects_users(obj_type: str='users', obj_id: str = "", parent_id: str = 
     resp = requests.get(url=endpoint, headers=HEADERS, params=PARAMS)
 
     if resp.status_code >= 400:
-        logging.warn("Request Failed {} \n    {}".format(resp.status_code, resp.text))
+        logging.warning("Request Failed {} \n    {}".format(resp.status_code, resp.text))
 
         return None
 
-    # Add baord id as tap-defined field 'boardId'
+    # Add board id as tap-defined field 'boardId'
     user_objects = resp.json()
     for user in user_objects:
         user['boardId'] = parent_id
@@ -134,11 +134,11 @@ def get_objects(obj_type: str, obj_id: str = "", parent_id: str = "", since = No
         endpoint = get_url_string("get", obj_type, obj_id, parent_id)
         parameters = PARAMS
 
-        print(" * Test Data |  Request: GET on {}, with parameters: {}".format(endpoint, [p for p in parameters if p[0] not in ["key", "token"]]))
+        logging.info(" * Test Data |  Request: GET on {}, with parameters: {}".format(endpoint, [p for p in parameters if p[0] not in ["key", "token"]]))
 
         resp = requests.get(url=endpoint, headers=HEADERS, params=parameters)
         if resp.status_code >= 400:
-            logging.warn("Request Failed {} \n    {}".format(resp.status_code, resp.text))
+            logging.warning("Request Failed {} \n    {}".format(resp.status_code, resp.text))
             return None
 
         # API returns a single object, wrap it in a list
@@ -156,11 +156,11 @@ def get_objects(obj_type: str, obj_id: str = "", parent_id: str = "", since = No
         parameters += (('fields', 'all'),)
         parameters += (('checkItem_fields', 'all'),)
 
-    print(" * Test Data |  Request: GET on {}, with parameters: {}".format(endpoint, [p for p in parameters if p[0] not in ["key", "token"]]))
+    logging.info(" * Test Data |  Request: GET on {}, with parameters: {}".format(endpoint, [p for p in parameters if p[0] not in ["key", "token"]]))
 
     resp = requests.get(url=endpoint, headers=HEADERS, params=parameters)
     if resp.status_code >= 400:
-        logging.warn("Request Failed {} \n    {}".format(resp.status_code, resp.text))
+        logging.warning("Request Failed {} \n    {}".format(resp.status_code, resp.text))
 
         return None
 
@@ -172,7 +172,7 @@ def get_objects_cards(obj_type="cards", obj_id: str = "", parent_id: str = "", s
     -  or -
     get a specific obj by id
     """
-    print(" * Test Data |  Request: GET on /{}/{}".format(obj_type, obj_id))
+    logging.info(" * Test Data |  Request: GET on /{}/{}".format(obj_type, obj_id))
 
     endpoint = get_url_string("get", obj_type, obj_id, parent_id)
     if custom_fields:
@@ -186,7 +186,7 @@ def get_objects_cards(obj_type="cards", obj_id: str = "", parent_id: str = "", s
 
     resp = requests.get(url=endpoint, headers=HEADERS, params=parameters)
     if resp.status_code >= 400:
-        logging.warn("Request Failed {} \n    {}".format(resp.status_code, resp.text))
+        logging.warning("Request Failed {} \n    {}".format(resp.status_code, resp.text))
 
         return None
     add_to_resp = dict()
@@ -201,7 +201,7 @@ def get_objects_cards(obj_type="cards", obj_id: str = "", parent_id: str = "", s
             endpoint = BASE_URL + '/customFields/{}/options/{}'.format(list_id, option_id)
             resp_options = requests.get(url=endpoint, headers=HEADERS, params=parameters)
             if resp_options.status_code >= 400:
-                logging.warn("Request Failed {} \n    {}".format(resp_options.status_code, resp_options.text))
+                logging.warning("Request Failed {} \n    {}".format(resp_options.status_code, resp_options.text))
                 return None
             add_to_resp = {'option': resp_options.json().get('value').get('text')}
             resp_json.update({'value': add_to_resp})
@@ -374,18 +374,18 @@ def get_total_record_count_and_objects(child_stream: str="", since = None):
 
     # Reset PARENT_OBJECTS if we're switching to a different parent stream type
     if CURRENT_PARENT_STREAM != parent_stream:
-        print(f" * Test Data | Switching parent stream from '{CURRENT_PARENT_STREAM}' to '{parent_stream}' for child stream '{child_stream}'")
+        logging.info(f" * Test Data | Switching parent stream from '{CURRENT_PARENT_STREAM}' to '{parent_stream}' for child stream '{child_stream}'")
         PARENT_OBJECTS = []
         CURRENT_PARENT_STREAM = parent_stream
 
     if not PARENT_OBJECTS:
-        print(f" * Test Data | Loading parent objects for parent stream '{parent_stream}'")
+        logging.info(f" * Test Data | Loading parent objects for parent stream '{parent_stream}'")
         PARENT_OBJECTS = get_objects(obj_type=parent_stream, since=since)
 
         if PARENT_OBJECTS is None:
             raise Exception(f"Failed to fetch parent objects for stream '{parent_stream}'.")
 
-        print(f" * Test Data | Loaded {len(PARENT_OBJECTS)} parent objects of type '{parent_stream}'")
+        logging.info(f" * Test Data | Loaded {len(PARENT_OBJECTS)} parent objects of type '{parent_stream}'")
 
     # If true, then this stream is top level so just need 1 get ^
     if parent_stream == child_stream:
@@ -415,7 +415,7 @@ def get_total_record_count_and_objects(child_stream: str="", since = None):
 ### Test Data
 ##########################################################################
 tstamp = dt.utcnow().timestamp() # this is used to genereate unique dat
-print(" * Test Data | INITIALIZING tstamp to {}".format(tstamp))
+logging.info(" * Test Data | INITIALIZING tstamp to {}".format(tstamp))
 
 def get_test_data():
     global tstamp
@@ -481,7 +481,7 @@ def update_object(obj_type: str, obj_id: str = '', parent_id: str = '', field_to
     """
     update an existing object in order to genereate a new 'actions' record
     """
-    print(" * Test Data | Request: PUT on /{}/".format(obj_type))
+    logging.info(" * Test Data | Request: PUT on /{}/".format(obj_type))
 
     if not obj_id:
         obj_id = get_random_object_id(obj_type)
@@ -501,10 +501,10 @@ def update_object(obj_type: str, obj_id: str = '', parent_id: str = '', field_to
             data_to_update = {field_to_update: data.get(field_to_update)} # just change the name for baords (actions)
         data_to_update = {field_to_update: "admin"} # add member to a board for users
         endpoint = get_url_string("put", obj_type, obj_id, parent_id)
-        print(" * Test Data | Changing: {} ".format(data_to_update))
+        logging.info(" * Test Data | Changing: {} ".format(data_to_update))
         resp = requests.put(url=endpoint, headers=HEADERS, params=PARAMS, json=data_to_update)
         if resp.status_code >= 400:
-            logging.warn("Request Failed {} \n    {}".format(resp.status_code, resp.text))
+            logging.warning("Request Failed {} \n    {}".format(resp.status_code, resp.text))
             return None
 
         return resp.json()
@@ -519,7 +519,7 @@ def update_object_action(obj_id: str = ''):  #, field_to_update: str = 'name'):
     data = {"value": get_action_comment(update=True)}
     resp = requests.put(url=endpoint, headers=HEADERS, params=PARAMS, json=data)
     if resp.status_code >= 400:
-        logging.warn("Request Failed {} \n    {}".format(resp.status_code, resp.text))
+        logging.warning("Request Failed {} \n    {}".format(resp.status_code, resp.text))
         return None
 
     return resp.json()
@@ -530,7 +530,7 @@ def update_object_board(obj_id: str = '', field_to_update: str = 'name'):
         obj_id = get_random_object_id('boards')
 
     if obj_id == NEVER_DELETE_BOARD_ID:
-        logging.warn("Request Ignored |  You tried to change a board that other tests rely on |  " +\
+        logging.warning("Request Ignored |  You tried to change a board that other tests rely on |  " +\
                      "Board (id={}) should not be altered".format(NEVER_DELETE_BOARD_ID))
         raise Exception("We do not have enough boards. We are being forced to update board named 'NEVER DELETE'")
 
@@ -538,10 +538,10 @@ def update_object_board(obj_id: str = '', field_to_update: str = 'name'):
     if data:
         data_to_update = {field_to_update: data.get(field_to_update)}
         endpoint = get_url_string('put', 'boards', obj_id, '')
-        print(" * Test Data | Changing: {} ".format(data_to_update))
+        logging.info(" * Test Data | Changing: {} ".format(data_to_update))
         resp = requests.put(url=endpoint, headers=HEADERS, params=PARAMS, json=data_to_update)
         if resp.status_code >= 400:
-            logging.warn("Request Failed {} \n    {}".format(resp.status_code, resp.text))
+            logging.warning("Request Failed {} \n    {}".format(resp.status_code, resp.text))
             return None
 
         return resp.json()
@@ -560,12 +560,12 @@ def update_object_user(obj_id: str = '', parent_id: str = '', field_to_update: s
     if data:
         data_to_update = {field_to_update: "normal"} # add member to a board for users
         endpoint = get_url_string('put', 'users', obj_id, parent_id)
-        print(" * Test Data | Changing: {} ".format(data_to_update))
+        logging.info(" * Test Data | Changing: {} ".format(data_to_update))
         resp = requests.put(url=endpoint, headers=HEADERS, params=PARAMS, json=data_to_update)
         if resp.status_code >= 400:
-            logging.warn("Request Failed {} \n    {}".format(resp.status_code, resp.text))
+            logging.warning("Request Failed {} \n    {}".format(resp.status_code, resp.text))
             data_to_update = {field_to_update: "admin"} # add member to a board for users
-            print(" * Test Data | Changing: {} ".format(data_to_update))
+            logging.info(" * Test Data | Changing: {} ".format(data_to_update))
             resp = requests.put(url=endpoint, headers=HEADERS, params=PARAMS, json=data_to_update)
             if resp.status_code >= 400:
                 return None
@@ -627,7 +627,7 @@ def create_object_actions(recipient_stream: str = "boards", obj_id: str = "", ac
                 attempts += 1
 
             if obj_id == NEVER_DELETE_BOARD_ID:
-                logging.warn("Request Ignored |  You tried to change a board that other tests rely on |  " +\
+                logging.warning("Request Ignored |  You tried to change a board that other tests rely on |  " +\
                              "Board (id={}) should not be altered".format(NEVER_DELETE_BOARD_ID))
                 raise Exception("We do not have enough boards. We are being forced to update board named 'NEVER DELETE'")
 
@@ -643,10 +643,10 @@ def create_object_actions(recipient_stream: str = "boards", obj_id: str = "", ac
             data_to_update = {field_to_update: get_action_comment()}
 
             endpoint = BASE_URL + "/{}/{}/actions/comments".format(recipient_stream, obj_id)
-            print(" * Test Data | Changing: {} ".format(data_to_update))
+            logging.info(" * Test Data | Changing: {} ".format(data_to_update))
             resp = requests.post(url=endpoint, headers=HEADERS, params=PARAMS, json=data_to_update)
             if resp.status_code >= 400:
-                logging.warn("Request Failed {} \n    {}".format(resp.status_code, resp.text))
+                logging.warning("Request Failed {} \n    {}".format(resp.status_code, resp.text))
 
                 return None
 
@@ -655,7 +655,7 @@ def create_object_actions(recipient_stream: str = "boards", obj_id: str = "", ac
             resp = requests.get(url=endpoint, headers=HEADERS, params=PARAMS)
 
             if resp.status_code >= 400:
-                logging.warn("Request Failed {} \n    {}".format(resp.status_code, resp.text))
+                logging.warning("Request Failed {} \n    {}".format(resp.status_code, resp.text))
                 return None
 
             parent_id = resp.json().get('id')
@@ -665,10 +665,10 @@ def create_object_actions(recipient_stream: str = "boards", obj_id: str = "", ac
             data_to_update = {field_to_update: data.get(field_to_update)} # just change the name for baords (actions)
 
             endpoint = get_url_string("put", recipient_stream, obj_id)
-            print(" * Test Data | Changing: {} ".format(data_to_update))
+            logging.info(" * Test Data | Changing: {} ".format(data_to_update))
             resp = requests.put(url=endpoint, headers=HEADERS, params=PARAMS, json=data_to_update)
             if resp.status_code >= 400:
-                logging.warn("Request Failed {} \n    {}".format(resp.status_code, resp.text))
+                logging.warning("Request Failed {} \n    {}".format(resp.status_code, resp.text))
 
                 return None
 
@@ -684,7 +684,7 @@ def create_object_actions(recipient_stream: str = "boards", obj_id: str = "", ac
 
 def create_object_boards(obj_type: str='boards'):
     global PARENT_OBJECTS
-    print(" * Test Data | Request: POST on /{}/".format(obj_type))
+    logging.info(" * Test Data | Request: POST on /{}/".format(obj_type))
 
     data = stream_to_data_mapping(obj_type)
     if data:
@@ -692,10 +692,10 @@ def create_object_boards(obj_type: str='boards'):
         resp = requests.post(url=endpoint, headers=HEADERS, params=PARAMS, json=data)
 
         if resp.status_code >= 400:
-            logging.warn("Request Failed {} \n    {}".format(resp.status_code, resp.text))
+            logging.warning("Request Failed {} \n    {}".format(resp.status_code, resp.text))
             return None
 
-        print(" * Test Data | Tracking {} object in PARENT_OBJECTS".format(obj_type))
+        logging.info(" * Test Data | Tracking {} object in PARENT_OBJECTS".format(obj_type))
         PARENT_OBJECTS.append(resp.json())
 
         return resp.json()
@@ -703,7 +703,7 @@ def create_object_boards(obj_type: str='boards'):
     raise NotImplementedError
 
 def create_object_lists(obj_type: str='lists', parent_id=''):
-    print(" * Test Data | Request: POST on /{}/".format(obj_type))
+    logging.info(" * Test Data | Request: POST on /{}/".format(obj_type))
 
     data = stream_to_data_mapping(obj_type)
     if data:
@@ -714,7 +714,7 @@ def create_object_lists(obj_type: str='lists', parent_id=''):
         resp = requests.post(url=endpoint, headers=HEADERS, params=PARAMS, json=data)
 
         if resp.status_code >= 400:
-            logging.warn("Request Failed {} \n    {}".format(resp.status_code, resp.text))
+            logging.warning("Request Failed {} \n    {}".format(resp.status_code, resp.text))
             return None
 
         return resp.json()
@@ -722,7 +722,7 @@ def create_object_lists(obj_type: str='lists', parent_id=''):
     raise NotImplementedError
 
 def create_object_cards(obj_type: str = 'cards', parent_id = '', custom = False, field_type = None):
-    print(" * Test Data | Request: POST on /{}/".format(obj_type))
+    logging.info(" * Test Data | Request: POST on /{}/".format(obj_type))
 
     data = stream_to_data_mapping(obj_type)
     if data:
@@ -739,7 +739,7 @@ def create_object_cards(obj_type: str = 'cards', parent_id = '', custom = False,
         resp = requests.post(url=endpoint, headers=HEADERS, params=PARAMS, json=data)
 
         if resp.status_code >= 400:
-            logging.warn("Request Failed {} \n    {}".format(resp.status_code, resp.text))
+            logging.warning("Request Failed {} \n    {}".format(resp.status_code, resp.text))
             return None
 
         return resp.json()
@@ -774,13 +774,13 @@ def create_object(obj_type, obj_id: str = "", parent_id: str = "",
     }
 
     if obj_type in uncreatable_streams:
-        print(" * Test Data | SKIPPING CREATE for {}: {}".format(obj_type, uncreatable_streams[obj_type]))
+        logging.info(" * Test Data | SKIPPING CREATE for {}: {}".format(obj_type, uncreatable_streams[obj_type]))
         logging.info("Stream {} cannot be created directly via test utilities: {}".format(
             obj_type, uncreatable_streams[obj_type]))
         return None
 
     if obj_type == 'actions':
-        print(" * Test Data | DIRECT CREATES ARE UNAVAILABLE for {}. ".format(obj_type) +\
+        logging.info(" * Test Data | DIRECT CREATES ARE UNAVAILABLE for {}. ".format(obj_type) +\
               "UPDATING another stream to generate new record")
         if action_type:
             return create_object_actions('cards', obj_id=parent_id, action_type=action_type)
@@ -799,15 +799,15 @@ def create_object(obj_type, obj_id: str = "", parent_id: str = "",
         return create_object_lists(parent_id=parent_id)
 
     elif obj_type == 'users':
-        print(" * Test Data | CREATES ARE UNAVAILABLE for {}".format(obj_type))
+        logging.info(" * Test Data | CREATES ARE UNAVAILABLE for {}".format(obj_type))
         return update_object_user(obj_id=obj_id, parent_id=parent_id,)
 
     elif obj_type == 'organizations':
-        print(" * Test Data | SKIPPING CREATE for {}: Organizations already exist in test account".format(obj_type))
+        logging.info(" * Test Data | SKIPPING CREATE for {}: Organizations already exist in test account".format(obj_type))
         logging.info("Stream {} uses existing organizations from test account".format(obj_type))
         return None
 
-    print(" * Test Data | Request: POST on /{}/".format(obj_type))
+    logging.info(" * Test Data | Request: POST on /{}/".format(obj_type))
 
     data = stream_to_data_mapping(obj_type)
 
@@ -817,7 +817,7 @@ def create_object(obj_type, obj_id: str = "", parent_id: str = "",
         resp = requests.post(url=endpoint, headers=HEADERS, params=PARAMS, json=data)
 
         if resp.status_code >= 400:
-            logging.warn("Request Failed {} \n    {}".format(resp.status_code, resp.text))
+            logging.warning("Request Failed {} \n    {}".format(resp.status_code, resp.text))
             return None
 
         return resp.json()
@@ -825,7 +825,7 @@ def create_object(obj_type, obj_id: str = "", parent_id: str = "",
     raise NotImplementedError
 
 def delete_object(obj_type, obj_id: str = "", parent_id: str = ""):
-    print(" * Test Data | Request: DELETE on /{}/".format(obj_type))
+    logging.info(" * Test Data | Request: DELETE on /{}/".format(obj_type))
     # TODO | WIP | do a delete for boards, then try for lists | can't delete actions or users
 
     # Don't delete that one board we don't want to delete because all users are on it
@@ -836,14 +836,14 @@ def delete_object(obj_type, obj_id: str = "", parent_id: str = ""):
             attempts += 1
 
     if obj_id == NEVER_DELETE_BOARD_ID:
-        logging.warn("Request Ignored |  You tried to delete a board that other tests rely on |  " +\
+        logging.warning("Request Ignored |  You tried to delete a board that other tests rely on |  " +\
                      "Board (id={}) should not be deleted".format(NEVER_DELETE_BOARD_ID))
         return None
 
     endpoint = get_url_string("delete", obj_type, obj_id, parent_id)
     resp = requests.delete(url=endpoint, headers=HEADERS, params=PARAMS)
     if resp.status_code >= 400:
-        logging.warn("Request Failed {} \n    {}".format(resp.status_code, resp.text))
+        logging.warning("Request Failed {} \n    {}".format(resp.status_code, resp.text))
         return None
 
     return resp.json()
@@ -852,7 +852,7 @@ def reset_tracked_parent_objects():  # TODO Reset all tracked data if we end up 
     global PARENT_OBJECTS, CURRENT_PARENT_STREAM
     PARENT_OBJECTS = []
     CURRENT_PARENT_STREAM = None
-    print(" * Test Data | RESETTING TRACKED PARENT OBJECTS")
+    logging.info(" * Test Data | RESETTING TRACKED PARENT OBJECTS")
     return
 
 ##########################################################################
@@ -889,10 +889,10 @@ def create_custom_field(obj_type: str = "boards", obj_id : str = "", field_type 
                  "pos": "{}".format(random.randint(1,9999))},
             )
 
-    print(" * Test Data | Creating: {} on board {}".format(data.get('name'), obj_id))
+    logging.info(" * Test Data | Creating: {} on board {}".format(data.get('name'), obj_id))
     resp = requests.post(url=endpoint, headers=HEADERS, params=PARAMS, json=data)
     if resp.status_code >= 400:
-        logging.warn("Request Failed {} \n    {}".format(resp.status_code, resp.text))
+        logging.warning("Request Failed {} \n    {}".format(resp.status_code, resp.text))
         return None
     return resp.json()
 
@@ -910,13 +910,13 @@ def create_custom_field(obj_type: str = "boards", obj_id : str = "", field_type 
 #     return resp.json()
 
 def get_custom_fields(obj_type, obj_id):
-    print(" * Test Data | GET: get customFieldItems on {} {}".format(obj_type, obj_id))
+    logging.info(" * Test Data | GET: get customFieldItems on {} {}".format(obj_type, obj_id))
     endpoint = BASE_URL + "/{}/{}/customFields".format(obj_type, obj_id)
 
     resp = requests.get(url=endpoint, headers=HEADERS, params=PARAMS)
 
     if resp.status_code >= 400:
-        logging.warn("Request Failed {} \n    {}".format(resp.status_code, resp.text))
+        logging.warning("Request Failed {} \n    {}".format(resp.status_code, resp.text))
         return None
 
     return resp.json()
@@ -982,44 +982,44 @@ if __name__ == "__main__":
 
     objects_to_test = ['boards'] # ['actions', 'boards', 'cards', 'lists', 'users', 'checklists']
 
-    print("********** Testing basic functions of utils **********")
+    logging.info("********** Testing basic functions of utils **********")
     if test_creates:
         for obj in objects_to_test:
-            print("Testing CREATE: {}".format(obj))
+            logging.info("Testing CREATE: {}".format(obj))
             created_obj = create_object(obj)
             if created_obj:
-                print("SUCCESS")
+                logging.info("SUCCESS")
                 if print_objects:
-                    print(created_obj)
+                    logging.info(created_obj)
                 continue
-            print("FAILED")
+            logging.warning("FAILED")
     if test_updates:
         for obj in objects_to_test:
-            print("Testing UPDATE: {}".format(obj))
+            logging.info("Testing UPDATE: {}".format(obj))
             updated_obj = update_object(obj)
             if updated_obj:
-                print("SUCCESS")
+                logging.info("SUCCESS")
                 if print_objects:
-                    print(updated_obj)
+                    logging.info(updated_obj)
                 continue
-            print("FAILED")
+            logging.warning("FAILED")
     if test_gets:
         for obj in objects_to_test:
-            print("Testing GET: {}".format(obj))
+            logging.info("Testing GET: {}".format(obj))
             existing_objs = get_objects(obj)
             if existing_objs:
-                print("SUCCESS")
+                logging.info("SUCCESS")
                 if print_objects:
-                    print(existing_objs)
+                    logging.info(existing_objs)
                 continue
-            print("FAILED")
+            logging.warning("FAILED")
     if test_deletes:
         for obj in objects_to_test:
-            print("Testing DELETE: {}".format(obj))
+            logging.info("Testing DELETE: {}".format(obj))
             deleted_obj = delete_object(obj)
             if deleted_obj:
-                print("SUCCESS")
+                logging.info("SUCCESS")
                 if print_objects:
-                    print(deleted_obj)
+                    logging.info(deleted_obj)
                 continue
-            print("FAILED")
+            logging.warning("FAILED")

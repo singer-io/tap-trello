@@ -13,6 +13,23 @@ from base import TrelloBaseTest
 
 
 class TrelloBookmarkStates(TrelloBaseTest):
+    """
+    Test bookmark state handling for interrupted and standard sync.
+
+    Test Criteria:
+    1. Standard sync (state_0): Bookmarks are correctly saved and syncs replicate all expected records
+    2. Interrupted incremental sync (state_1): Resumes from last parent_id with date windowing (window_start, sub_window_end, window_end)
+    3. Interrupted full table sync (state_2): Resumes from last parent_id without sub-windowing (window_start, window_end, parent_id)
+    4. Bookmark structure validation: All incremental streams have proper bookmark fields (window_start or date)
+    5. Data consistency: Interrupted syncs replicate only remaining records from bookmarked point forward
+    6. Record count validation: Verify expected number of records for each bookmark state scenario
+
+    Test Scenarios:
+    - state_0: Complete sync from start_date, validates full replication
+    - state_1: Simulates killed job mid-sync for incremental streams (with date windowing)
+    - state_2: Simulates killed job mid-sync for full table streams (without date windowing)
+    """
+
     LOOKBACK_WINDOW = 1  # days
     TEST_BOARD_ID = utils.NEVER_DELETE_BOARD_ID
 
@@ -68,7 +85,7 @@ class TrelloBookmarkStates(TrelloBaseTest):
         return states
 
     def test_run(self):
-        print("\n\nRUNNING {}\n\n".format(self.name()))
+        logging.info("\n\nRUNNING {}\n\n".format(self.name()))
 
         # Initialize start date prior to first sync
         self.START_DATE = self.get_properties().get('start_date')
@@ -118,7 +135,7 @@ class TrelloBookmarkStates(TrelloBaseTest):
 
         diff = self.expected_check_streams().symmetric_difference( found_catalog_names )
         self.assertEqual(len(diff), 0, msg="discovered schemas do not match: {}".format(diff))
-        print("discovered schemas are OK")
+        logging.info("discovered schemas are OK")
 
         #select all catalogs
         for c in found_catalogs:
@@ -127,7 +144,7 @@ class TrelloBookmarkStates(TrelloBaseTest):
             for k in self.expected_automatic_fields()[c['stream_name']]:
                 mdata = next((m for m in catalog_entry['metadata']
                               if len(m['breadcrumb']) == 2 and m['breadcrumb'][1] == k), None)
-                print("Validating inclusion on {}: {}".format(c['stream_name'], mdata))
+                logging.info("Validating inclusion on {}: {}".format(c['stream_name'], mdata))
                 self.assertTrue(mdata and mdata['metadata']['inclusion'] == 'automatic')
 
             connections.select_catalog_and_fields_via_metadata(conn_id, c, catalog_entry)
@@ -148,7 +165,7 @@ class TrelloBookmarkStates(TrelloBaseTest):
         replicated_row_count =  reduce(lambda accum,c : accum + c, record_count_by_stream.values())
         self.assertGreater(replicated_row_count, 0,
                            msg="failed to replicate any data: {}".format(record_count_by_stream))
-        print("total replicated row count: {}".format(replicated_row_count))
+        logging.info("total replicated row count: {}".format(replicated_row_count))
         synced_records = runner.get_records_from_target_output()
 
         # Verify bookmarks were saved for all streams
@@ -160,7 +177,7 @@ class TrelloBookmarkStates(TrelloBaseTest):
             # Verify bookmark has either window_start or date field
             has_bookmark_field = 'window_start' in bookmark or 'date' in bookmark
             self.assertTrue(has_bookmark_field, msg=f"Stream {stream} bookmark missing window_start or date field")
-        print("Bookmarks meet expectations")
+        logging.info("Bookmarks meet expectations")
 
         # Grab the empty formatted states to test
         states_to_test = [self.get_states_formatted(i) for i in range(len(self.ACTIONS_STATES))]
@@ -174,11 +191,11 @@ class TrelloBookmarkStates(TrelloBaseTest):
         window_start_0 = dt.strptime(self.START_DATE, self.START_DATE_FORMAT)
         states_to_test[0]['bookmarks']['actions']['window_start'] = window_start_0.strftime(self.TEST_TIME_FORMAT)
 
-        print("Interjecting test state:\n{}".format(states_to_test[0]))
+        logging.info("Interjecting test state:\n{}".format(states_to_test[0]))
         menagerie.set_state(conn_id, states_to_test[0], version_0)
 
         # Run another sync
-        print("Running sync job 0")
+        logging.info("Running sync job 0")
         sync_job_name_0 = runner.run_sync_mode(self, conn_id)
 
         #verify tap and target exit codes
@@ -192,11 +209,11 @@ class TrelloBookmarkStates(TrelloBaseTest):
         replicated_row_count_0 =  reduce(lambda accum,c : accum + c, record_count_by_stream_0.values())
         self.assertGreater(replicated_row_count_0, 0,
                            msg="failed to replicate any data: {}".format(record_count_by_stream_0))
-        print("total replicated row count: {}".format(replicated_row_count_0))
+        logging.info("total replicated row count: {}".format(replicated_row_count_0))
         synced_records_0 = runner.get_records_from_target_output()
 
         # Test state_0
-        print("Testing State 0")
+        logging.info("Testing State 0")
         state_0 = menagerie.get_state(conn_id)
         for stream in self.expected_incremental_streams():
             # Verify bookmarks were saved as expected inc streams
@@ -204,7 +221,7 @@ class TrelloBookmarkStates(TrelloBaseTest):
             self.assertTrue(bookmark, msg=f"No bookmark found for stream {stream}")
             has_bookmark_field = 'window_start' in bookmark or 'date' in bookmark
             self.assertTrue(has_bookmark_field, msg=f"Stream {stream} bookmark missing window_start or date field")
-            print("Bookmarks meet expectations")
+            logging.info("Bookmarks meet expectations")
         for stream in self.expected_sync_streams().difference(self.untestable_streams()):
             data = synced_records.get(stream)
             if not data:
@@ -251,11 +268,11 @@ class TrelloBookmarkStates(TrelloBaseTest):
         window_start_1 = dt.strptime(self.START_DATE, self.START_DATE_FORMAT)
         states_to_test[1]['bookmarks']['actions']['window_start'] = window_start_1.strftime(self.TEST_TIME_FORMAT)
 
-        print("Interjecting test state:\n{}".format(states_to_test[1]))
+        logging.info("Interjecting test state:\n{}".format(states_to_test[1]))
         menagerie.set_state(conn_id, states_to_test[1], version_1)
 
         # Run another sync (state_1)
-        print("Running sync job 1")
+        logging.info("Running sync job 1")
         sync_job_name_1 = runner.run_sync_mode(self, conn_id)
 
         #verify tap and target exit codes
@@ -269,12 +286,12 @@ class TrelloBookmarkStates(TrelloBaseTest):
         replicated_row_count_1 =  reduce(lambda accum,c : accum + c, record_count_by_stream_1.values())
         self.assertGreater(replicated_row_count_1, 0,
                            msg="failed to replicate any data: {}".format(record_count_by_stream_1))
-        print("total replicated row count: {}".format(replicated_row_count_1))
+        logging.info("total replicated row count: {}".format(replicated_row_count_1))
 
         synced_records_1 = runner.get_records_from_target_output()
 
         # Test state_1
-        print("Testing State 1")
+        logging.info("Testing State 1")
         state_1 = menagerie.get_state(conn_id)
         for stream in self.expected_incremental_streams().difference(self.untestable_streams()):
             # Verify bookmarks were saved as expected inc streams
@@ -282,7 +299,7 @@ class TrelloBookmarkStates(TrelloBaseTest):
             self.assertTrue(bookmark, msg=f"No bookmark found for stream {stream}")
             has_bookmark_field = 'window_start' in bookmark or 'date' in bookmark
             self.assertTrue(has_bookmark_field, msg=f"Stream {stream} bookmark missing window_start or date field")
-            print("Bookmarks for {} meet expectations".format(stream))
+            logging.info("Bookmarks for {} meet expectations".format(stream))
 
             # Verify the original sync catches more data since current test state bookmarks on the second most recent board
             self.assertGreater(record_count_by_stream.get(stream, 0),
@@ -317,12 +334,12 @@ class TrelloBookmarkStates(TrelloBaseTest):
             for record in records_last_board:
                 if record.get('id') in actual_data:
                     continue
-                print("MISSING RECORD {}".format(record))
+                logging.warning("MISSING RECORD {}".format(record))
 
             for record in records_penult_window_start:
                 if record.get('id') in actual_data:
                     continue
-                print("MISSING RECORD {}".format(record))
+                logging.warning("MISSING RECORD {}".format(record))
 
             self.assertEqual(expected_record_count_1, record_count_by_stream_1.get(stream, 0),
                              msg="Sync 1 should only replicate data from the most recently creted board.")
@@ -343,11 +360,11 @@ class TrelloBookmarkStates(TrelloBaseTest):
                                                       'window_end':  window_end_2,
                                                       'parent_id': last_created_parent_id}
 
-        print("Interjecting test state:\n{}".format(states_to_test[2]))
+        logging.info("Interjecting test state:\n{}".format(states_to_test[2]))
         menagerie.set_state(conn_id, states_to_test[2], version_2)
 
         # Run another sync
-        print("Running sync job 2")
+        logging.info("Running sync job 2")
         sync_job_name_2 = runner.run_sync_mode(self, conn_id)
 
         #verify tap and target exit codes
@@ -361,18 +378,18 @@ class TrelloBookmarkStates(TrelloBaseTest):
         replicated_row_count_2 =  reduce(lambda accum,c : accum + c, record_count_by_stream_2.values())
         self.assertGreater(replicated_row_count_2, 0,
                            msg="failed to replicate any data: {}".format(record_count_by_stream_2))
-        print("total replicated row count: {}".format(replicated_row_count_2))
+        logging.info("total replicated row count: {}".format(replicated_row_count_2))
         synced_records_2 = runner.get_records_from_target_output()
 
         # Test state_2
-        print("Testing State 2")
+        logging.info("Testing State 2")
         state_2 = menagerie.get_state(conn_id)
         for stream in self.expected_full_table_sync_streams().difference(self.untestable_streams()):
             # Verify bookmarks were saved as expected full table streams
             bookmark = state_2.get('bookmarks', {}).get(stream, {})
             self.assertTrue(bookmark, msg="{} should have a bookmark value".format(stream))
             self.assertTrue('window_start' in bookmark, msg="{} should have window_start in bookmark".format(stream))
-            print("Bookmarks meet expectations")
+            logging.info("Bookmarks meet expectations")
 
             # Verify the smaller window replicates less data
             self.assertLessEqual(record_count_by_stream_2.get(stream, 0),
@@ -392,7 +409,7 @@ class TrelloBookmarkStates(TrelloBaseTest):
         ##########################################################################
         stream_to_delete = 'boards'
         boards_remaining = 5
-        print("Deleting all but {} records for stream {}.".format(boards_remaining, stream_to_delete))
+        logging.info("Deleting all but {} records for stream {}.".format(boards_remaining, stream_to_delete))
         board_count = len(expected_records.get(stream_to_delete, []))
         for obj_to_delete in expected_records.get(stream_to_delete, []): # Delete all baords between syncs
             if board_count > boards_remaining:

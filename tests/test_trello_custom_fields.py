@@ -1,5 +1,6 @@
-import unittest
 import copy
+import logging
+import unittest
 
 from functools import reduce
 
@@ -67,7 +68,7 @@ class TestTrelloCustomFields(TrelloBaseTest):
         fetch of data.  For instance if you have a limit of 250 records ensure
         that 251 (or more) records have been posted for that stream.
         """
-        print("\n\nRUNNING {}\n\n".format(self.name()))
+        logging.info("\n\nRUNNING {}\n\n".format(self.name()))
 
         # Resetting tracked parent objects prior to test
         utils.reset_tracked_parent_objects()
@@ -78,7 +79,7 @@ class TestTrelloCustomFields(TrelloBaseTest):
         custom_fields_by_board= {x.get('id'): copy.deepcopy(custom_fields_dict) for x in existing_boards} # ids by stream
 
         # get existing custom fields for each board
-        print("Getting objects on baord with static custom field set")
+        logging.info("Getting objects on board with static custom field set")
         for board_id, board_cfields in custom_fields_by_board.items():
             cfields = utils.get_custom_fields('boards', board_id)
             for field in self.expected_custom_fields():
@@ -90,7 +91,7 @@ class TestTrelloCustomFields(TrelloBaseTest):
         expected_records_cfields = list()
         board_id = utils.NEVER_DELETE_BOARD_ID
         all_cards_on_board = utils.get_objects('cards', parent_id=board_id)
-        print("Setting custom fields expectations based on static data")
+        logging.info("Setting custom fields expectations based on static data")
         for card in all_cards_on_board:
             card_with_cfields = utils.get_objects('cards', obj_id=card.get('id'),
                                                    parent_id=board_id, custom_fields=True)
@@ -132,7 +133,7 @@ class TestTrelloCustomFields(TrelloBaseTest):
         found_catalog_names = set(map(lambda c: c['tap_stream_id'], found_catalogs))
         diff = self.expected_check_streams().symmetric_difference( found_catalog_names )
         self.assertEqual(len(diff), 0, msg="discovered schemas do not match: {}".format(diff))
-        print("discovered schemas are OK")
+        logging.info("discovered schemas are OK")
 
         # Select all streams and all fields
         self.select_all_streams_and_fields(conn_id, found_catalogs, select_all_fields=True)
@@ -142,7 +143,7 @@ class TestTrelloCustomFields(TrelloBaseTest):
             for k in self.expected_automatic_fields()[cat['stream_name']]:
                 mdata = next((m for m in catalog_entry['metadata']
                               if len(m['breadcrumb']) == 2 and m['breadcrumb'][1] == k), None)
-                print("Validating inclusion on {}: {}".format(cat['stream_name'], mdata))
+                logging.info("Validating inclusion on {}: {}".format(cat['stream_name'], mdata))
                 self.assertTrue(mdata and mdata['metadata']['inclusion'] == 'automatic')
 
         catalogs = menagerie.get_catalogs(conn_id)
@@ -169,10 +170,10 @@ class TestTrelloCustomFields(TrelloBaseTest):
             assert stream in self.expected_sync_streams()
             if stream in self.untestable_streams():
                 if count == 0:
-                    print(f"SKIPPING: No data for untestable stream: {stream}")
+                    logging.info(f"SKIPPING: No data for untestable stream: {stream}")
                     continue
             self.assertGreater(count, 0, msg="failed to replicate any data for: {}".format(stream))
-        print("total replicated row count: {}".format(replicated_row_count))
+        logging.info("total replicated row count: {}".format(replicated_row_count))
 
         # Testing streams with custom fields
         for stream in self.testable_streams():

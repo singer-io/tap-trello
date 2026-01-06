@@ -14,6 +14,27 @@ from base import TrelloBaseTest
 
 
 class TrelloBookmarksQA(TrelloBaseTest):
+    """
+    Test tap sets a bookmark and respects it for the next sync of a stream.
+
+    Test Criteria:
+    1. Full table streams: Replicate all records on each sync, handle new records between syncs
+    2. Incremental streams: Only replicate new/updated records after bookmark, respect start_date
+    3. Bookmark persistence: Bookmarks saved correctly with proper fields (window_start or date)
+    4. Lookback window: Records within lookback period are re-synced (1 day default)
+    5. Update detection: Updated records are captured in subsequent syncs
+    6. Record completeness: All expected records present in sync output, no data loss
+    7. Field validation: Replicated records contain expected fields (excluding synthetic fields)
+    8. Start date filtering: Only records on or after start_date are replicated
+    9. Data consistency: Record IDs and content match expectations across multiple syncs
+
+    Test Flow:
+    - Sync 1: Initial sync from start_date (3 days ago), establish baseline
+    - Between syncs: Create new records (full table), update action comments (incremental)
+    - Sync 2: Validate incremental behavior, verify updates captured, check lookback window
+    - Validation: Compare record counts, IDs, and field contents between syncs
+    """
+
     LOOKBACK_WINDOW = 1  # days
 
     def name(self):
@@ -31,7 +52,7 @@ class TrelloBookmarksQA(TrelloBaseTest):
         }
 
     def test_run(self):
-        print("\n\nRUNNING {}\n\n".format(self.name()))
+        logging.info("\n\nRUNNING {}\n\n".format(self.name()))
 
         # ensure data exists for sync streams and set expectations
         expected_records_1 = {x: [] for x in self.expected_sync_streams()} # ids by stream
@@ -81,7 +102,7 @@ class TrelloBookmarksQA(TrelloBaseTest):
 
         diff = self.expected_check_streams().symmetric_difference( found_catalog_names )
         self.assertEqual(len(diff), 0, msg="discovered schemas do not match: {}".format(diff))
-        print("discovered schemas are OK")
+        logging.info("discovered schemas are OK")
 
         #select all catalogs
         for c in found_catalogs:
@@ -90,7 +111,7 @@ class TrelloBookmarksQA(TrelloBaseTest):
             for k in self.expected_automatic_fields()[c['stream_name']]:
                 mdata = next((m for m in catalog_entry['metadata']
                               if len(m['breadcrumb']) == 2 and m['breadcrumb'][1] == k), None)
-                print("Validating inclusion on {}: {}".format(c['stream_name'], mdata))
+                logging.info("Validating inclusion on {}: {}".format(c['stream_name'], mdata))
                 self.assertTrue(mdata and mdata['metadata']['inclusion'] == 'automatic')
 
             connections.select_catalog_and_fields_via_metadata(conn_id, c, catalog_entry)
@@ -110,7 +131,7 @@ class TrelloBookmarksQA(TrelloBaseTest):
         )
         replicated_row_count_1 =  reduce(lambda accum,c : accum + c, record_count_by_stream_1.values())
         self.assertGreater(replicated_row_count_1, 0, msg="failed to replicate any data: {}".format(record_count_by_stream_1))
-        print("total replicated row count: {}".format(replicated_row_count_1))
+        logging.info("total replicated row count: {}".format(replicated_row_count_1))
 
         # get emitted with records
         synced_records_1 = runner.get_records_from_target_output()
@@ -124,10 +145,10 @@ class TrelloBookmarksQA(TrelloBaseTest):
             # Verify bookmark has either window_start or date field
             has_bookmark_field = 'window_start' in bookmark or 'date' in bookmark
             self.assertTrue(has_bookmark_field, msg=f"Stream {stream} bookmark missing window_start or date field")
-        print("Bookmarks meet expectations")
+        logging.info("Bookmarks meet expectations")
 
         # Generate data between syncs for bookmarking streams
-        print("Generating more data prior to 2nd sync")
+        logging.info("Generating more data prior to 2nd sync")
         expected_records_2 = {x: [] for x in self.expected_sync_streams()}
         for stream in self.expected_full_table_sync_streams().difference(self.untestable_streams()):
             for _ in range(1):
@@ -140,14 +161,14 @@ class TrelloBookmarksQA(TrelloBaseTest):
                                                    for field in self.expected_automatic_fields().get(stream)})
 
         # Update a single comment action before second sync
-        print("Updating existing data prior to 2nd sync")
+        logging.info("Updating existing data prior to 2nd sync")
         updated_records = {x: [] for x in self.expected_sync_streams()}
         action_id_to_update = random.choice(action_comments).get('id')
         updated_action = utils.update_object_action(obj_id=action_id_to_update)
         updated_records['actions'].append(updated_action)
 
         # Get new actions from data manipulation between syncs
-        print("Acquiring in-test actions prior to 2nd sync")
+        logging.info("Acquiring in-test actions prior to 2nd sync")
         for stream in self.expected_incremental_streams().difference(self.untestable_streams()):
             bookmark = state_1.get('bookmarks').get(stream, {})
             # Get bookmark value - could be 'window_start' (actions) or 'date' (organization_actions)
@@ -166,7 +187,7 @@ class TrelloBookmarksQA(TrelloBaseTest):
                                                    for field in self.expected_automatic_fields().get(stream)})
 
         # Run another sync
-        print("Running 2nd sync job")
+        logging.info("Running 2nd sync job")
         sync_job_name_2 = runner.run_sync_mode(self, conn_id)
 
         #verify tap and target exit codes
@@ -180,7 +201,7 @@ class TrelloBookmarksQA(TrelloBaseTest):
         replicated_row_count_2 =  reduce(lambda accum,c : accum + c, record_count_by_stream_2.values())
         self.assertGreater(replicated_row_count_2, 0,
                            msg="failed to replicate any data: {}".format(record_count_by_stream_2))
-        print("total replicated row count: {}".format(replicated_row_count_2))
+        logging.info("total replicated row count: {}".format(replicated_row_count_2))
 
         # get emitted with records
         synced_records_2 = runner.get_records_from_target_output()
@@ -193,7 +214,7 @@ class TrelloBookmarksQA(TrelloBaseTest):
             self.assertTrue(bookmark, msg=f"No bookmark found for stream {stream}")
             has_bookmark_field = 'window_start' in bookmark or 'date' in bookmark
             self.assertTrue(has_bookmark_field, msg=f"Stream {stream} bookmark missing window_start or date field")
-        print("Bookmarks meet expectations")
+        logging.info("Bookmarks meet expectations")
 
         # TESTING FULL TABLE STREAMS
         for stream in self.expected_full_table_sync_streams().difference(self.untestable_streams()):
@@ -274,7 +295,7 @@ class TrelloBookmarksQA(TrelloBaseTest):
                     self.assertGreaterEqual(len(new_records_in_sync2), 0,
                                      msg="Expected some new records in sync 2 for {}".format(stream))
 
-        print("Full table streams tested.")
+        logging.info("Full table streams tested.")
 
         # TESTING INCREMENTAL STREAMS
         for stream in self.expected_incremental_streams().difference(self.untestable_streams()):
@@ -346,12 +367,12 @@ class TrelloBookmarksQA(TrelloBaseTest):
                     else:
                         self.assertEqual(original_action_text, current_action_text, msg="Text does not match expected.")
 
-        print("Incremental streams tested.")
+        logging.info("Incremental streams tested.")
 
         # CLEANING UP
         stream_to_delete = 'boards'
         boards_remaining = 5
-        print("Deleting all but {} records for stream {}.".format(boards_remaining, stream_to_delete))
+        logging.info("Deleting all but {} records for stream {}.".format(boards_remaining, stream_to_delete))
         board_count = len(expected_records_1.get(stream_to_delete, [])) + len(expected_records_2.get(stream_to_delete, []))
         for obj_to_delete in expected_records_2.get(stream_to_delete, []): # Delete all baords between syncs
             if board_count > boards_remaining:

@@ -68,7 +68,7 @@ class TestTrelloPagination(TrelloBaseTest):
         fetch of data.  For instance if you have a limit of 250 records ensure
         that 251 (or more) records have been posted for that stream.
         """
-        print("\n\nRUNNING {}\n\n".format(self.name()))
+        logging.info("\n\nRUNNING {}\n\n".format(self.name()))
 
         # Ensure tested streams have a record count which exceeds the API LIMIT
         expected_records = {x: [] for x in self.expected_sync_streams()} # ids by stream
@@ -124,7 +124,7 @@ class TestTrelloPagination(TrelloBaseTest):
 
         diff = self.expected_check_streams().symmetric_difference( found_catalog_names )
         self.assertEqual(len(diff), 0, msg="discovered schemas do not match: {}".format(diff))
-        print("discovered schemas are OK")
+        logging.info("discovered schemas are OK")
 
         #select all catalogs
         for cat in found_catalogs:
@@ -133,7 +133,7 @@ class TestTrelloPagination(TrelloBaseTest):
             for k in self.expected_automatic_fields()[cat['stream_name']]:
                 mdata = next((m for m in catalog_entry['metadata']
                               if len(m['breadcrumb']) == 2 and m['breadcrumb'][1] == k), None)
-                print("Validating inclusion on {}: {}".format(cat['stream_name'], mdata))
+                logging.info("Validating inclusion on {}: {}".format(cat['stream_name'], mdata))
                 self.assertTrue(mdata and mdata['metadata']['inclusion'] == 'automatic')
 
             connections.select_catalog_and_fields_via_metadata(conn_id, cat, catalog_entry)

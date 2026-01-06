@@ -13,7 +13,16 @@ from base import TrelloBaseTest
 
 
 class TestTrelloAutomaticFields(TrelloBaseTest):
-    """Test that with no fields selected for a stream automatic fields are still replicated"""
+    """
+    Test that automatic fields are correctly replicated when no fields are explicitly selected.
+
+    Test Criteria:
+    1. Only automatic fields are replicated
+    2. All automatic fields are present in replicated records
+    3. All expected records are replicated for testable streams
+    4. Record data matches expectations (accounting for deduplication in parent-child streams)
+    5. Testable streams must return at least one record (fail if zero records)
+    """
 
     def untestable_streams(self):
         return {'card_attachments', 'organization_actions'}
@@ -23,15 +32,15 @@ class TestTrelloAutomaticFields(TrelloBaseTest):
 
     def test_run(self):
         """
-        Verify that for each stream you can get multiple pages of data
-        when no fields are selected and only the automatic fields are replicated.
+        Verify that for each stream only automatic fields are replicated
+        when no fields are explicitly selected.
 
         PREREQUISITE
         For EACH stream add enough data that you surpass the limit of a single
         fetch of data.  For instance if you have a limit of 250 records ensure
         that 251 (or more) records have been posted for that stream.
         """
-        print("\n\nRUNNING {}\n\n".format(self.name()))
+        logging.info("\n\nRUNNING {}\n\n".format(self.name()))
 
         # Resetting tracked parent objects prior to test
         utils.reset_tracked_parent_objects()
@@ -79,7 +88,7 @@ class TestTrelloAutomaticFields(TrelloBaseTest):
         found_catalog_names = set(map(lambda c: c['tap_stream_id'], found_catalogs))
         diff = self.expected_check_streams().symmetric_difference( found_catalog_names )
         self.assertEqual(len(diff), 0, msg="discovered schemas do not match: {}".format(diff))
-        print("discovered schemas are OK")
+        logging.info("discovered schemas are OK")
 
         # Select all streams but only automtic fields
         self.select_all_streams_and_fields(conn_id, found_catalogs, select_all_fields=False)
@@ -89,7 +98,7 @@ class TestTrelloAutomaticFields(TrelloBaseTest):
             for k in self.expected_automatic_fields()[cat['stream_name']]:
                 mdata = next((m for m in catalog_entry['metadata']
                               if len(m['breadcrumb']) == 2 and m['breadcrumb'][1] == k), None)
-                print("Validating inclusion on {}: {}".format(cat['stream_name'], mdata))
+                logging.info("Validating inclusion on {}: {}".format(cat['stream_name'], mdata))
                 self.assertTrue(mdata and mdata['metadata']['inclusion'] == 'automatic')
 
         catalogs = menagerie.get_catalogs(conn_id)
@@ -116,23 +125,21 @@ class TestTrelloAutomaticFields(TrelloBaseTest):
             assert stream in self.expected_sync_streams()
             if stream in self.untestable_streams():
                 if count == 0:
-                    print(f"SKIP: No data for untestable stream: {stream}")
+                    logging.info(f"SKIP: No data for untestable stream: {stream}")
                     continue
             self.assertGreater(count, 0, msg="failed to replicate any data for: {}".format(stream))
-        print("total replicated row count: {}".format(replicated_row_count))
+        logging.info("total replicated row count: {}".format(replicated_row_count))
+
+        # For streams with parent IDs or deduplicated streams, just verify keys are present
+        streams_with_parent_ids = {
+            'board_labels', 'board_memberships', 'board_custom_fields',
+            'organization_members', 'organization_memberships',
+            'card_attachments', 'card_custom_field_items', 'users'
+            }
 
         for stream in self.testable_streams():
             with self.subTest(stream=stream):
-                # Skip validation if stream has no expected records
-                if stream not in expected_records or len(expected_records.get(stream, [])) == 0:
-                    logging.warning("Skipping validation for stream {} - no expected records available".format(stream))
-                    continue
-
                 data = synced_records.get(stream)
-                if not data or not data.get('messages'):
-                    logging.warning("Stream {} has no synced records - skipping validation".format(stream))
-                    continue
-
                 record_messages_keys = [set(row['data'].keys()) for row in data['messages']]
                 expected_keys = self.expected_automatic_fields().get(stream)
 
@@ -161,13 +168,6 @@ class TestTrelloAutomaticFields(TrelloBaseTest):
                                      msg="Number of actual records should match expectations for stream {}.".format(stream))
 
                 # verify by values, that we replicated the expected records
-                # For streams with parent IDs or deduplicated streams, just verify keys are present
-                streams_with_parent_ids = {
-                    'board_labels', 'board_memberships', 'board_custom_fields',
-                    'organization_members', 'organization_memberships',
-                    'card_attachments', 'card_custom_field_items', 'users'
-                }
-
                 if stream in ('actions', 'members', 'users') or stream in streams_with_parent_ids:
                     self.assertGreater(len(actual_records), 0,
                                        msg="Should have records for stream {}.".format(stream))
@@ -182,7 +182,7 @@ class TestTrelloAutomaticFields(TrelloBaseTest):
         # CLEAN UP
         stream_to_delete = 'boards'
         boards_remaining = 5
-        print("Deleting all but {} records for stream {}.".format(boards_remaining, stream_to_delete))
+        logging.info("Deleting all but {} records for stream {}.".format(boards_remaining, stream_to_delete))
         board_count = len(expected_records.get(stream_to_delete, []))
         for obj_to_delete in expected_records.get(stream_to_delete, []): # Delete all baords between syncs
             if board_count > boards_remaining:

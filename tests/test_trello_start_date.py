@@ -13,7 +13,23 @@ from base import TrelloBaseTest
 
 
 class TestTrelloStartDate(TrelloBaseTest):
-    """Test that we are paginating for streams when exceeding the API record limit of a single query"""
+    """
+    Test that start_date configuration correctly filters data for incremental streams.
+
+    Test Criteria:
+    1. Incremental streams: Only replicate records on or after start_date
+    2. Full table streams: Replicate all records regardless of start_date
+    3. Start date changes: Earlier start_date yields more records for incremental streams
+    4. Record count validation: Verify expected record counts for each replication method
+    5. Data filtering: Confirm no records before start_date are replicated for incremental streams
+    6. Full table consistency: Record counts remain constant for full table streams across different start dates
+
+    Test Flow:
+    - Sync 1: Initial sync with start_date = today (UTC)
+    - Between syncs: Change start_date to 60 days earlier
+    - Sync 2: New connection with earlier start_date, verify incremental streams get more records
+    - Validation: Incremental streams have more records in sync 2, full table streams have same count
+    """
 
     API_LIMIT = 50
     INCREMENTAL = "INCREMENTAL"
@@ -52,7 +68,7 @@ class TestTrelloStartDate(TrelloBaseTest):
         fetch of data.  For instance if you have a limit of 250 records ensure
         that 251 (or more) records have been posted for that stream.
         """
-        print("\n\nRUNNING {}\n\n".format(self.name()))
+        logging.info("\n\nRUNNING {}\n\n".format(self.name()))
 
         # Initialize start date prior to first sync
         self.START_DATE = self.get_properties().get('start_date')
@@ -103,7 +119,7 @@ class TestTrelloStartDate(TrelloBaseTest):
 
         diff = self.expected_check_streams().symmetric_difference( found_catalog_names )
         self.assertEqual(len(diff), 0, msg="discovered schemas do not match: {}".format(diff))
-        print("discovered schemas are OK")
+        logging.info("discovered schemas are OK")
 
         # select all catalogs
         for cat in found_catalogs:
@@ -112,7 +128,7 @@ class TestTrelloStartDate(TrelloBaseTest):
             for k in self.expected_automatic_fields()[cat['stream_name']]:
                 mdata = next((m for m in catalog_entry['metadata']
                               if len(m['breadcrumb']) == 2 and m['breadcrumb'][1] == k), None)
-                print("Validating inclusion on {}: {}".format(cat['stream_name'], mdata))
+                logging.info("Validating inclusion on {}: {}".format(cat['stream_name'], mdata))
                 self.assertTrue(mdata and mdata['metadata']['inclusion'] == 'automatic')
             connections.select_catalog_and_fields_via_metadata(conn_id, cat, catalog_entry)
 
@@ -131,7 +147,7 @@ class TestTrelloStartDate(TrelloBaseTest):
                                                                      self.expected_sync_streams(), self.expected_pks())
         replicated_row_count_1 =  reduce(lambda accum,c : accum + c, record_count_by_stream_1.values())
         self.assertGreater(replicated_row_count_1, 0, msg="failed to replicate any data: {}".format(record_count_by_stream_1))
-        print("total replicated row count: {}".format(replicated_row_count_1))
+        logging.info("total replicated row count: {}".format(replicated_row_count_1))
         synced_records_1 = runner.get_records_from_target_output()
 
         ##########################################################################
@@ -142,7 +158,7 @@ class TestTrelloStartDate(TrelloBaseTest):
         self.START_DATE = dt.strftime(dt.strptime(self.START_DATE, self.START_DATE_FORMAT) \
                                       - timedelta(days=60), self.START_DATE_FORMAT)
         start_date_2 = self.START_DATE
-        print("REPLAICATION START DATE CHANGE: {} ===>>> {} ".format(start_date_1, start_date_2))
+        logging.info("REPLICATION START DATE CHANGE: {} ===>>> {} ".format(start_date_1, start_date_2))
 
         ##########################################################################
         ### Second Sync
@@ -165,7 +181,7 @@ class TestTrelloStartDate(TrelloBaseTest):
 
         diff = self.expected_check_streams().symmetric_difference(found_catalog_names)
         self.assertEqual(len(diff), 0, msg="discovered schemas do not match: {}".format(diff))
-        print("discovered schemas are kosher")
+        logging.info("discovered schemas are kosher")
 
         # select all catalogs
         for cat in found_catalogs:
@@ -174,7 +190,7 @@ class TestTrelloStartDate(TrelloBaseTest):
             for k in self.expected_automatic_fields()[cat['stream_name']]:
                 mdata = next((m for m in catalog_entry['metadata']
                               if len(m['breadcrumb']) == 2 and m['breadcrumb'][1] == k), None)
-                print("Validating inclusion on {}: {}".format(cat['stream_name'], mdata))
+                logging.info("Validating inclusion on {}: {}".format(cat['stream_name'], mdata))
                 self.assertTrue(mdata and mdata['metadata']['inclusion'] == 'automatic')
             connections.select_catalog_and_fields_via_metadata(conn_id, cat, catalog_entry)
 
@@ -193,7 +209,7 @@ class TestTrelloStartDate(TrelloBaseTest):
                                                                      self.expected_sync_streams(), self.expected_pks())
         replicated_row_count_2 =  reduce(lambda accum,c : accum + c, record_count_by_stream_2.values(), 0)
         self.assertGreater(replicated_row_count_2, 0, msg="failed to replicate any data: {}".format(record_count_by_stream_2))
-        print("total replicated row count: {}".format(replicated_row_count_2))
+        logging.info("total replicated row count: {}".format(replicated_row_count_2))
 
         synced_records_2 = runner.get_records_from_target_output()
 
@@ -248,7 +264,7 @@ class TestTrelloStartDate(TrelloBaseTest):
         # CLEAN UP
         stream_to_delete = 'boards'
         boards_remaining = 5
-        print("Deleting all but {} records for stream {}.".format(boards_remaining, stream_to_delete))
+        logging.info("Deleting all but {} records for stream {}.".format(boards_remaining, stream_to_delete))
         board_count = len(expected_records.get(stream_to_delete, []))
         for obj_to_delete in expected_records.get(stream_to_delete, []): # Delete all baords between syncs
             if board_count > boards_remaining:
