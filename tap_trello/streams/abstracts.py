@@ -11,28 +11,29 @@ from singer import (Transformer, get_bookmark, get_logger, metadata, metrics,
 
 LOGGER = get_logger()
 
+# NB: We've observed that Trello will only return 50 actions, this is to sub-paginate
+MAX_API_RESPONSE_SIZE = 50
+
+
 class OrderChecker:
     """ Class with context manager to check ordering of values. """
     order = None
     _last_value = None
+    check_paired_order = None
 
     def __init__(self, order='ASC'):
         self.order = order
+        self.check_paired_order = operator.lt if order == 'ASC' else operator.gt
 
     def check_order(self, current_value):
         """
         We are sub-paginating based on a sort order descending assumption for
         Actions, this ensures that this holds up.
         """
-        if self.order == 'ASC':
-            check_paired_order = operator.lt
-        else:
-            check_paired_order = operator.gt
-
         if self._last_value is None:
             self._last_value = current_value
 
-        if check_paired_order(current_value, self._last_value):
+        if self.check_paired_order(current_value, self._last_value):
             asc_desc = "ascending" if self.order == 'ASC' else "descending"
             gt_lt = "less than" if self.order == 'ASC' else "greater than"
             raise Exception(
@@ -57,23 +58,15 @@ class OrderChecker:
     def __exit__(self, *args):
         """ Required for context manager usage. """
 
-class Mixin:
-    """ Empty class to mark mixin classes as such. """
 
-class Unsortable(Mixin):
+class Unsortable:
     """
-    Mixin class to mark a Stream subclass as Unsortable
+    Marker class to identify Stream subclasses that are unsortable.
     NB: No current functionality, but we thought it was useful for higher-order declarative behavior.
-    e.g.:
-        class MyStream(Unsortable, Stream):
-            # Specify properties, implement unique things
     """
 
 
-# NB: We've observed that Trello will only return 50 actions, this is to sub-paginate
-MAX_API_RESPONSE_SIZE = 50
-
-class DateWindowPaginated(Mixin):
+class DateWindowPaginated:
     """
     Mixin class to provide date windowing on the `get_records` requests
     """
@@ -171,7 +164,6 @@ class DateWindowPaginated(Mixin):
                 break
 
 
-
 class LegacyStream:
     """
     Legacy base class for Trello streams (pre-refactor).
@@ -239,48 +231,6 @@ class LegacyStream:
     def sync(self):
         for rec in self.get_records(self.get_format_values()):
             yield rec
-
-class AddCustomFields(Mixin):
-    def _get_dropdown_option_key(self, field_id, option_id):
-        return field_id + '_' + option_id
-
-    def build_custom_fields_maps(self, **kwargs):
-        custom_fields_map = {}
-        dropdown_options_map = {}
-        board_id_list = kwargs['parent_id_list']
-        # The custom fields are defined on the board level, so this function is called on a per-board basis
-        # Therefore, we assert that only one board is being passed in
-        assert len(board_id_list) == 1
-        custom_fields = self.client.get('/boards/{}/customFields'.format(board_id_list[0])) # pylint: disable=no-member
-        for custom_field in custom_fields:
-            custom_fields_map[custom_field['id']] = custom_field['name']
-            if custom_field['type'] == 'list':
-                for dropdown_option in custom_field['options']:
-                    dropdown_option_key = self._get_dropdown_option_key(dropdown_option['idCustomField'], dropdown_option['id'])
-                    dropdown_options_map[dropdown_option_key] = dropdown_option['value']['text']
-
-        return custom_fields_map, dropdown_options_map
-
-
-    def modify_record(self, record, **kwargs):
-        custom_fields_map = kwargs['custom_fields_map']
-        dropdown_options_map = kwargs['dropdown_options_map']
-        for custom_field in record['customFieldItems']:
-            custom_field['name'] = custom_fields_map[custom_field['idCustomField']]
-            if custom_field.get('idValue', None):
-                dropdown_option_key = self._get_dropdown_option_key(custom_field['idCustomField'], custom_field['idValue'])
-                custom_field['value'] = {'option': dropdown_options_map[dropdown_option_key]}
-
-        return record
-
-
-
-class AddBoardId(Mixin):
-    def modify_record(self, record, **kwargs):
-        board_id_list = kwargs['parent_id_list']
-        assert len(board_id_list) == 1
-        record["boardId"] = board_id_list[0]
-        return record
 
 
 class LegacyChildStream(LegacyStream):
@@ -422,7 +372,6 @@ class BaseStream(ABC):
         Docs:
          - https://github.com/singer-io/getting-started/blob/master/docs/SYNC_MODE.md
         """
-
 
     def get_records(self) -> Iterator:
         """Interacts with api client interaction and pagination."""

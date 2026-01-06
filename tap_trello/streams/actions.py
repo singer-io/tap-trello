@@ -3,7 +3,6 @@ from tap_trello.streams.boards import Boards
 
 
 class Actions(DateWindowPaginated, ChildStream):
-    # TODO: If an action is completed on a board, does the board's dateLastActivity get updated?
     stream_id = "actions"
     stream_name = "actions"
     endpoint = "/boards/{}/actions"
