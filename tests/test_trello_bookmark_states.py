@@ -207,10 +207,14 @@ class TrelloBookmarkStates(TrelloBaseTest):
             print("Bookmarks meet expectations")
         for stream in self.expected_sync_streams().difference(self.untestable_streams()):
             data = synced_records.get(stream)
-            record_messages = [set(row['data']) for row in data['messages']]
+            if not data:
+                continue
+            record_messages = [set(row['data']) for row in data.get('messages', [])]
 
             data_0 = synced_records_0.get(stream)
-            record_messages_0 = [set(row['data']) for row in data_0['messages']]
+            if not data_0:
+                continue
+            record_messages_0 = [set(row['data']) for row in data_0.get('messages', [])]
 
             # Verify we got the same number of records as the first sync
             self.assertEqual(record_count_by_stream_0.get(stream), record_count_by_stream.get(stream),

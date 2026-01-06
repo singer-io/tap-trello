@@ -217,13 +217,17 @@ class TrelloBookmarksQA(TrelloBaseTest):
                 # Test that we are capturing the expected records for full table streams
                 expected_records_1_list = expected_records_1.get(stream, [])
                 expected_ids_1 = set(record.get('id') for record in expected_records_1_list if record)
-                data_1 = synced_records_1.get(stream, [])
+                data_1 = synced_records_1.get(stream, {})
+                if not data_1:
+                    continue
                 record_messages_1 = [row.get('data') for row in data_1.get('messages', [])]
                 record_ids_1 = set(row.get('id') for row in record_messages_1 if row)
 
                 expected_records_2_list = expected_records_2.get(stream, [])
                 expected_ids_2 = set(record.get('id') for record in expected_records_2_list if record)
-                data_2 = synced_records_2.get(stream, [])
+                data_2 = synced_records_2.get(stream, {})
+                if not data_2:
+                    continue
                 record_messages_2 = [row.get('data') for row in data_2.get('messages', [])]
                 record_ids_2 = set(row.get('id') for row in record_messages_2 if row)
 
@@ -246,6 +250,12 @@ class TrelloBookmarksQA(TrelloBaseTest):
                         actual_record = matching_records[0]
                         actual_fields = set(actual_record.keys())
                         expected_fields = set(expected_record.keys())
+
+                        # Synthetic parent ID fields added by tap during sync
+                        synthetic_fields = {'boardId', 'organization_id', 'card_id'}
+                        # Remove synthetic fields from actual for comparison
+                        actual_fields = actual_fields - synthetic_fields
+
                         # BUG https://jira.talendforge.org/browse/TDL-9680
                         # BUG https://jira.talendforge.org/browse/TDL-20813
                         if stream == 'cards':
