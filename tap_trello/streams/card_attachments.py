@@ -6,3 +6,9 @@ class CardAttachments(FullTableStream):
     replication_method = "FULL_TABLE"
     path = "/cards/{id}/attachments"
     parent = "cards"
+
+    def modify_object(self, record, parent_record=None):
+        """Add card_id to card attachment records."""
+        if parent_record and 'id' in parent_record:
+            record["card_id"] = parent_record['id']
+        return record
