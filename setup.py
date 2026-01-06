@@ -1,5 +1,5 @@
 #!/usr/bin/env python
-from setuptools import setup
+from setuptools import find_packages, setup
 
 setup(
     name="tap-trello",
@@ -27,9 +27,9 @@ setup(
     [console_scripts]
     tap-trello=tap_trello:main
     """,
-    packages=["tap_trello"],
+    packages=find_packages(),
     package_data = {
-        "tap_trello": ["tap_trello/schemas/*.json"]
+        "tap_trello": ["schemas/*.json"]
     },
     include_package_data=True,
 )
