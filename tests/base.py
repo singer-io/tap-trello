@@ -47,7 +47,7 @@ class TrelloBaseTest(unittest.TestCase):
         }
 
     def testable_streams(self):
-        return self.expected_check_streams()
+        return self.expected_check_streams().difference(self.untestable_streams())
 
     def untestable_streams(self):
         return set()

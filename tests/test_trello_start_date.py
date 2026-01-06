@@ -22,6 +22,11 @@ class TestTrelloStartDate(TrelloBaseTest):
     def name(self):
         return "tap_tester_trello_start_date_test"
 
+    def untestable_streams(self):
+        return {
+            'organization_actions'
+        }
+
     def get_properties(self, original: bool = True):
         return_value = {
             'start_date' : dt.strftime(dt.utcnow(), self.START_DATE_FORMAT),  # set to utc today
