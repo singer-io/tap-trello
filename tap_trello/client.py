@@ -67,18 +67,10 @@ class Client:
         self._member_id = None
 
     def __enter__(self):
-        self.check_api_credentials()
         return self
 
     def __exit__(self, exception_type, exception_value, traceback):
         self._session.close()
-
-    def check_api_credentials(self) -> None:
-        pass
-
-    def authenticate(self, headers: Dict, params: Dict) -> Tuple[Dict, Dict]:
-        """OAuth authentication is handled by session.auth"""
-        return headers, params
 
     def _get_member_id(self):
         resp = self.get('/members/me')
@@ -102,7 +94,6 @@ class Client:
         headers = headers or {}
         body = body or {}
         endpoint = endpoint or f"{self.base_url}/{path}"
-        headers, params = self.authenticate(headers, params)
         return self.__make_request(
             method, endpoint,
             headers=headers,
