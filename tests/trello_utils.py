@@ -10,6 +10,11 @@ from datetime import timedelta, date
 from datetime import datetime as dt
 from time import sleep
 
+# Trello API Rate Limits:
+# - 300 requests per 10 seconds per API key
+# - 100 requests per 10 seconds per token
+# - 100 requests per 900 seconds for /1/members/ endpoints
+RATE_LIMIT_WAIT_TIME = 11
 
 PARENT_OBJECTS = []
 CURRENT_PARENT_STREAM = None
@@ -105,9 +110,12 @@ def get_objects_users(obj_type: str='users', obj_id: str = "", parent_id: str = 
     endpoint = get_url_string("get", obj_type, obj_id, parent_id)
     resp = requests.get(url=endpoint, headers=HEADERS, params=PARAMS)
 
+    if resp.status_code == 429:
+        logging.error(f"Rate limit exceeded (429) for {endpoint}. /1/members/ endpoints have 900s rate limit window.")
+        return None
+
     if resp.status_code >= 400:
         logging.warning("Request Failed {} \n    {}".format(resp.status_code, resp.text))
-
         return None
 
     # Add board id as tap-defined field 'boardId'
@@ -137,6 +145,11 @@ def get_objects(obj_type: str, obj_id: str = "", parent_id: str = "", since = No
         logging.info(" * Test Data |  Request: GET on {}, with parameters: {}".format(endpoint, [p for p in parameters if p[0] not in ["key", "token"]]))
 
         resp = requests.get(url=endpoint, headers=HEADERS, params=parameters)
+
+        if resp.status_code == 429:
+            logging.error(f"Rate limit exceeded (429) for {endpoint}. /1/members/ endpoints have 900s rate limit window.")
+            return None
+
         if resp.status_code >= 400:
             logging.warning("Request Failed {} \n    {}".format(resp.status_code, resp.text))
             return None
@@ -158,13 +171,27 @@ def get_objects(obj_type: str, obj_id: str = "", parent_id: str = "", since = No
 
     logging.info(" * Test Data |  Request: GET on {}, with parameters: {}".format(endpoint, [p for p in parameters if p[0] not in ["key", "token"]]))
 
-    resp = requests.get(url=endpoint, headers=HEADERS, params=parameters)
-    if resp.status_code >= 400:
-        logging.warning("Request Failed {} \n    {}".format(resp.status_code, resp.text))
+    max_retries = 2
+    for attempt in range(max_retries):
+        resp = requests.get(url=endpoint, headers=HEADERS, params=parameters)
 
-        return None
+        if resp.status_code == 429:
+            if attempt < max_retries - 1:
+                wait_time = RATE_LIMIT_WAIT_TIME
+                logging.warning(f"Rate limit exceeded (429). Waiting {wait_time} seconds for rate limit window to reset... (attempt {attempt + 1}/{max_retries})")
+                sleep(wait_time)
+                continue
+            else:
+                logging.error(f"Rate limit exceeded after {max_retries} attempts. Giving up on {endpoint}")
+                return None
 
-    return resp.json()
+        if resp.status_code >= 400:
+            logging.warning("Request Failed {} \n    {}".format(resp.status_code, resp.text))
+            return None
+
+        return resp.json()
+
+    return None
 
 def get_objects_cards(obj_type="cards", obj_id: str = "", parent_id: str = "", since = None, custom_fields=False):
     """
@@ -184,30 +211,45 @@ def get_objects_cards(obj_type="cards", obj_id: str = "", parent_id: str = "", s
     if since:
         parameters = PARAMS + (('since', since),)
 
-    resp = requests.get(url=endpoint, headers=HEADERS, params=parameters)
-    if resp.status_code >= 400:
-        logging.warning("Request Failed {} \n    {}".format(resp.status_code, resp.text))
+    max_retries = 2
+    for attempt in range(max_retries):
+        resp = requests.get(url=endpoint, headers=HEADERS, params=parameters)
 
-        return None
-    add_to_resp = dict()
-    if custom_fields and len(resp.json()) == 1:
-        value = resp.json()[0].get('value', None)
-        if not value:
-            # more work needed for multiple lists(w/ options) cfields
-            resp_json = resp.json()[0]
-            option_id = resp_json.get('idValue')
-            list_id = resp_json.get('idCustomField')
-
-            endpoint = BASE_URL + '/customFields/{}/options/{}'.format(list_id, option_id)
-            resp_options = requests.get(url=endpoint, headers=HEADERS, params=parameters)
-            if resp_options.status_code >= 400:
-                logging.warning("Request Failed {} \n    {}".format(resp_options.status_code, resp_options.text))
+        if resp.status_code == 429:
+            if attempt < max_retries - 1:
+                wait_time = RATE_LIMIT_WAIT_TIME
+                logging.warning(f"Rate limit exceeded (429). Waiting {wait_time} seconds for rate limit window to reset... (attempt {attempt + 1}/{max_retries})")
+                sleep(wait_time)
+                continue
+            else:
+                logging.error(f"Rate limit exceeded after {max_retries} attempts. Giving up on {endpoint}")
                 return None
-            add_to_resp = {'option': resp_options.json().get('value').get('text')}
-            resp_json.update({'value': add_to_resp})
-            return [resp_json]
 
-    return resp.json()
+        if resp.status_code >= 400:
+            logging.warning("Request Failed {} \n    {}".format(resp.status_code, resp.text))
+            return None
+
+        add_to_resp = dict()
+        if custom_fields and len(resp.json()) == 1:
+            value = resp.json()[0].get('value', None)
+            if not value:
+                # more work needed for multiple lists(w/ options) cfields
+                resp_json = resp.json()[0]
+                option_id = resp_json.get('idValue')
+                list_id = resp_json.get('idCustomField')
+
+                endpoint = BASE_URL + '/customFields/{}/options/{}'.format(list_id, option_id)
+                resp_options = requests.get(url=endpoint, headers=HEADERS, params=parameters)
+                if resp_options.status_code >= 400:
+                    logging.warning("Request Failed {} \n    {}".format(resp_options.status_code, resp_options.text))
+                    return None
+                add_to_resp = {'option': resp_options.json().get('value').get('text')}
+                resp_json.update({'value': add_to_resp})
+                return [resp_json]
+
+        return resp.json()
+
+    return None
 
 
 def get_random_object_id(obj_type: str, parent_id: str = ""):
