@@ -6,3 +6,9 @@ class OrganizationMembers(FullTableStream):
     replication_method = "FULL_TABLE"
     path = "/organizations/{id}/members"
     parent = "organizations"
+
+    def modify_object(self, record, parent_record=None):
+        """Add organization_id to organization member records."""
+        if parent_record and 'id' in parent_record:
+            record["organization_id"] = parent_record['id']
+        return record
