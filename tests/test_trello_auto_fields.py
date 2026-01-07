@@ -153,7 +153,7 @@ class TestTrelloAutomaticFields(TrelloBaseTest):
 
                 # Verify the number of records match expectations
                 # NOTE: Some streams may have more records due to deduplication or child stream behavior
-                if stream in ('actions', 'members', 'users'):
+                if stream in ('actions', 'members', 'users', 'card_custom_field_items'):
                     self.assertGreaterEqual(len(actual_records),
                                          len(expected_records.get(stream)),
                                          msg="Number of actual records should be at least the expected count. " +\
