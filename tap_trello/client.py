@@ -2,13 +2,15 @@ from typing import Any, Dict, Mapping, Optional, Tuple
 
 import backoff
 import requests
-from requests import session
-from requests.exceptions import ChunkedEncodingError, ConnectionError, Timeout
-from singer import get_logger, metrics
 
+from requests import session
+from requests.exceptions import ChunkedEncodingError, ConnectionError, Timeout # pylint: disable=redefined-builtin
+from requests_oauthlib import OAuth1
+
+from singer import get_logger, metrics
 from tap_trello.exceptions import (ERROR_CODE_EXCEPTION_MAPPING,
                                    TrelloError,
-                                   TrelloBackoffError)
+                                   TrelloBackoffError, TrelloRateLimitError)
 
 LOGGER = get_logger()
 REQUEST_TIMEOUT = 300
@@ -55,20 +57,26 @@ class Client:
         config_request_timeout = config.get("request_timeout")
         self.request_timeout = float(config_request_timeout) if config_request_timeout else REQUEST_TIMEOUT
 
+        self.oauth = OAuth1(config['consumer_key'],
+                            client_secret=config['consumer_secret'],
+                            resource_owner_key=config['access_token'],
+                            resource_owner_secret=config['access_token_secret'],
+                            signature_method='HMAC-SHA1')
+        self._session.auth = self.oauth
+
+        self._member_id = None
+
     def __enter__(self):
-        self.check_api_credentials()
         return self
 
     def __exit__(self, exception_type, exception_value, traceback):
         self._session.close()
 
-    def check_api_credentials(self) -> None:
-        pass
-
-    def authenticate(self, headers: Dict, params: Dict) -> Tuple[Dict, Dict]:
-        """Authenticates the request with the token"""
-        headers["oauth1"] = self.config["{'consumer_key': 'consumer_key', 'consumer_secret': 'consumer_secret', 'access_token': 'access_token', 'access_token_secret': 'access_token_secret'}"]
-        return headers, params
+    def _get_member_id(self):
+        resp = self.get('/members/me')
+        if isinstance(resp, dict):
+            return resp.get('id')
+        return None
 
     def make_request(
         self,
@@ -86,7 +94,6 @@ class Client:
         headers = headers or {}
         body = body or {}
         endpoint = endpoint or f"{self.base_url}/{path}"
-        headers, params = self.authenticate(headers, params)
         return self.__make_request(
             method, endpoint,
             headers=headers,
@@ -102,7 +109,8 @@ class Client:
             ConnectionError,
             ChunkedEncodingError,
             Timeout,
-            TrelloBackoffError
+            TrelloBackoffError,
+            TrelloRateLimitError
         ),
         max_tries=5,
         factor=2,
@@ -122,3 +130,19 @@ class Client:
                 raise ValueError(f"Unsupported method: {method}")
 
         return response.json()
+
+    def get(self, path, headers=None, params=None):
+        """Helper method for GET requests (used by legacy streams)."""
+        return self.make_request('GET', None, params=params or {}, headers=headers or {}, path=path)
+
+    @property
+    def member_id(self) -> Any:
+        if self._member_id:
+            return self._member_id
+
+        try:
+            self._member_id = self._get_member_id()
+        except Exception:
+            self._member_id = None
+
+        return self._member_id

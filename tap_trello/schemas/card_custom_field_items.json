@@ -12,15 +12,37 @@
             ]
         },
         "value": {
-            "type": "object",
+            "type": [
+                "null",
+                "object"
+            ],
             "properties": {
                 "checked": {
                     "type": [
                         "null",
                         "string"
                     ]
+                },
+                "text": {
+                    "type": [
+                        "null",
+                        "string"
+                    ]
+                },
+                "number": {
+                    "type": [
+                        "null",
+                        "string"
+                    ]
                 }
-            }
+            },
+            "additionalProperties": true
+        },
+        "idValue": {
+            "type": [
+                "null",
+                "string"
+            ]
         },
         "idCustomField": {
             "type": [

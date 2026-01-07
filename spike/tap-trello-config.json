@@ -17,7 +17,7 @@
   "streams": [
         {
             "name": "board_memberships",
-            "key_properties": ["id"],
+            "key_properties": ["id", "boardId"],
             "replication_method": "FULL_TABLE",
             "replication_keys": null,
             "data_key": null,
@@ -28,7 +28,7 @@
         },
         {
             "name": "board_custom_fields",
-            "key_properties": ["id"],
+            "key_properties": ["id", "boardId"],
             "replication_method": "FULL_TABLE",
             "replication_keys": null,
             "data_key": null,
@@ -39,7 +39,7 @@
         },
         {
             "name": "board_labels",
-            "key_properties": ["id"],
+            "key_properties": ["id", "boardId"],
             "replication_method": "FULL_TABLE",
             "replication_keys": null,
             "data_key": null,
@@ -50,7 +50,7 @@
         },
         {
             "name": "card_attachments",
-            "key_properties": ["id"],
+            "key_properties": ["id", "card_id"],
             "replication_method": "FULL_TABLE",
             "replication_keys": null,
             "data_key": null,
@@ -61,7 +61,7 @@
         },
         {
             "name": "card_custom_field_items",
-            "key_properties": ["id"],
+            "key_properties": ["id", "card_id"],
             "replication_method": "FULL_TABLE",
             "replication_keys": null,
             "data_key": null,
@@ -77,7 +77,7 @@
             "replication_keys": null,
             "data_key": null,
             "path": "/members/{id}",
-            "parent": "boards",
+            "parent": "users",
             "children": [],
             "doc_link": "https://developer.atlassian.com/cloud/trello/rest/api-group-members/#api-members-id-get"
         },
@@ -87,14 +87,14 @@
             "replication_method": "FULL_TABLE",
             "replication_keys": null,
             "data_key": null,
-            "path": "/organizations/{id}",
+            "path": "/members/me/organizations",
             "parent": null,
             "children": [],
             "doc_link": "https://developer.atlassian.com/cloud/trello/rest/api-group-organizations/#api-organizations-id-get"
         },
         {
             "name": "organization_actions",
-            "key_properties": ["id"],
+            "key_properties": ["id", "organization_id"],
             "replication_method": "INCREMENTAL",
             "replication_keys": [
                 "date"
@@ -107,7 +107,7 @@
         },
         {
             "name": "organization_members",
-            "key_properties": ["id"],
+            "key_properties": ["id", "organization_id"],
             "replication_method": "FULL_TABLE",
             "replication_keys": null,
             "data_key": null,
@@ -118,7 +118,7 @@
         },
         {
             "name": "organization_memberships",
-            "key_properties": ["id"],
+            "key_properties": ["id", "organization_id"],
             "replication_method": "FULL_TABLE",
             "replication_keys": null,
             "data_key": null,

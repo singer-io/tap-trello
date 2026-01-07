@@ -1,47 +1,28 @@
-import tap_tester.connections as connections
-import tap_tester.menagerie   as menagerie
-import tap_tester.runner      as runner
-import trello_utils as utils
-
-import os
 import unittest
 import logging
-from datetime import timedelta, date
+from datetime import timedelta
 from datetime import datetime as dt
 from functools import reduce
 
+import tap_tester.connections as connections
+import tap_tester.menagerie   as menagerie
+import tap_tester.runner      as runner
 
-class TestTrelloPagination(unittest.TestCase):
+import trello_utils as utils
+from base import TrelloBaseTest
+
+
+class TestTrelloPagination(TrelloBaseTest):
     """Test that we are paginating for streams when exceeding the API record limit of a single query"""
-    START_DATE = ""
-    START_DATE_FORMAT = "%Y-%m-%dT00:00:00Z"
-    TEST_TIME_FORMAT = "%Y-%m-%dT%H:%M:%S.%fZ"
     API_LIMIT = 1000
-
-    def setUp(self):
-        missing_envs = [x for x in [
-            "TAP_TRELLO_CONSUMER_KEY",
-            "TAP_TRELLO_CONSUMER_SECRET",
-            "TAP_TRELLO_ACCESS_TOKEN",
-            "TAP_TRELLO_ACCESS_TOKEN_SECRET",
-        ] if os.getenv(x) == None]
-        if len(missing_envs) != 0:
-            raise Exception("Missing environment variables: {}".format(missing_envs))
 
     def name(self):
         return "tap_tester_trello_pagination_test"
 
-    def get_type(self):
-        return "platform.trello"
-
     def get_credentials(self):
-        return {
-            'consumer_key': os.getenv('TAP_TRELLO_CONSUMER_KEY'),
-            'consumer_secret': os.getenv('TAP_TRELLO_CONSUMER_SECRET'),
-            'access_token': os.getenv('TAP_TRELLO_ACCESS_TOKEN'),
-            'access_token_secret': os.getenv('TAP_TRELLO_ACCESS_TOKEN_SECRET'),
-            'cards_response_size': 50 # Configurable pagination limit for card stream
-        }
+        credentials = super().get_credentials()
+        credentials['cards_response_size'] = 50  # Configurable pagination limit for card stream
+        return credentials
 
     def testable_streams(self):
         """
@@ -52,42 +33,6 @@ class TestTrelloPagination(unittest.TestCase):
             'actions',
             'cards'
         }
-
-    def expected_check_streams(self):
-        return {
-            'actions',
-            'boards',
-            'cards',
-            'checklists',
-            'lists',
-            'users'
-        }
-
-    def expected_sync_streams(self):
-        return self.expected_check_streams()
-
-    def expected_pks(self):
-        return {
-            'actions' : {"id"},
-            'boards' : {"id"},
-            'cards' : {"id"},
-            'checklists': {"id"},
-            'lists' : {"id"},
-            'users' : {"id", "boardId"}
-        }
-
-    def expected_automatic_fields(self):
-        return {
-            'actions' : {"id", "date"},
-            'boards' : {"id"},
-            'cards' : {"id"},
-            'checklists': {"id"},
-            'lists' : {"id"},
-            'users' : {"id", "boardId"}
-        }
-
-    def tap_name(self):
-        return "tap-trello"
 
     def get_properties(self):
         return {
@@ -123,7 +68,7 @@ class TestTrelloPagination(unittest.TestCase):
         fetch of data.  For instance if you have a limit of 250 records ensure
         that 251 (or more) records have been posted for that stream.
         """
-        print("\n\nRUNNING {}\n\n".format(self.name()))
+        logging.info("\n\nRUNNING {}\n\n".format(self.name()))
 
         # Ensure tested streams have a record count which exceeds the API LIMIT
         expected_records = {x: [] for x in self.expected_sync_streams()} # ids by stream
@@ -179,7 +124,7 @@ class TestTrelloPagination(unittest.TestCase):
 
         diff = self.expected_check_streams().symmetric_difference( found_catalog_names )
         self.assertEqual(len(diff), 0, msg="discovered schemas do not match: {}".format(diff))
-        print("discovered schemas are OK")
+        logging.info("discovered schemas are OK")
 
         #select all catalogs
         for cat in found_catalogs:
@@ -188,7 +133,7 @@ class TestTrelloPagination(unittest.TestCase):
             for k in self.expected_automatic_fields()[cat['stream_name']]:
                 mdata = next((m for m in catalog_entry['metadata']
                               if len(m['breadcrumb']) == 2 and m['breadcrumb'][1] == k), None)
-                print("Validating inclusion on {}: {}".format(cat['stream_name'], mdata))
+                logging.info("Validating inclusion on {}: {}".format(cat['stream_name'], mdata))
                 self.assertTrue(mdata and mdata['metadata']['inclusion'] == 'automatic')
 
             connections.select_catalog_and_fields_via_metadata(conn_id, cat, catalog_entry)
@@ -212,7 +157,7 @@ class TestTrelloPagination(unittest.TestCase):
 
         for stream in self.testable_streams():
             with self.subTest(stream=stream):
-        
+
                 # Page limit for card stream(50) is configured in config above
                 self.API_LIMIT = 50 if stream == "cards" else 1000
 
