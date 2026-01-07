@@ -1,5 +1,5 @@
 #!/usr/bin/env python
-from setuptools import setup
+from setuptools import find_packages, setup
 
 setup(
     name="tap-trello",
@@ -12,8 +12,9 @@ setup(
     install_requires=[
         "singer-python==6.3.0",
         "requests==2.32.5",
-        "requests-oauthlib==1.3.0",
-        "backoff==2.2.1"
+        "requests-oauthlib==2.0.0",
+        "backoff==2.2.1",
+        "parameterized"
     ],
     extras_require={
         'dev': [
@@ -26,9 +27,9 @@ setup(
     [console_scripts]
     tap-trello=tap_trello:main
     """,
-    packages=["tap_trello"],
+    packages=find_packages(),
     package_data = {
-        "tap_trello": ["tap_trello/schemas/*.json"]
+        "tap_trello": ["schemas/*.json"]
     },
     include_package_data=True,
 )

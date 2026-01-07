@@ -10,17 +10,33 @@ from datetime import timedelta, date
 from datetime import datetime as dt
 from time import sleep
 
+# Trello API Rate Limits:
+# - 300 requests per 10 seconds per API key
+# - 100 requests per 10 seconds per token
+# - 100 requests per 900 seconds for /1/members/ endpoints
+RATE_LIMIT_WAIT_TIME = 11
 
 PARENT_OBJECTS = []
+CURRENT_PARENT_STREAM = None
 LIST_OBJECTS = []
 NEVER_DELETE_BOARD_ID = "5eb080e9d9e0f56e8311ab5f"
 PARENT_STREAM = {
-    'actions': 'boards',
-    'boards': 'boards',
-    'lists': 'boards',
-    'cards': 'boards',
-    'checklists': 'boards',
-    'users': 'boards'
+        'actions': 'boards',
+        'boards': 'boards',
+        'board_memberships': 'boards',
+        'board_custom_fields': 'boards',
+        'board_labels': 'boards',
+        'cards': 'boards',
+        'card_attachments': 'cards',
+        'card_custom_field_items': 'cards',
+        'checklists': 'boards',
+        'lists': 'boards',
+        'members': 'users',
+        'organizations': 'organizations',
+        'organization_actions': 'organizations',
+        'organization_members': 'organizations',
+        'organization_memberships': 'organizations',
+        'users': 'boards'
 }
 MAX_API_LIMIT = 1000 # this is the smallest
 # MAX_API_LIMIT = {
@@ -33,9 +49,19 @@ MAX_API_LIMIT = 1000 # this is the smallest
 REPLICATION_METHOD = {
     'actions': 'INCREMENTAL',
     'boards': 'FULL_TABLE',
+    'board_memberships': 'FULL_TABLE',
+    'board_custom_fields': 'FULL_TABLE',
+    'board_labels': 'FULL_TABLE',
     'cards': 'FULL_TABLE',
+    'card_attachments': 'FULL_TABLE',
+    'card_custom_field_items': 'FULL_TABLE',
     'checklists': 'FULL_TABLE',
     'lists': 'FULL_TABLE',
+    'members': 'FULL_TABLE',
+    'organizations': 'FULL_TABLE',
+    'organization_actions': 'INCREMENTAL',
+    'organization_members': 'FULL_TABLE',
+    'organization_memberships': 'FULL_TABLE',
     'users': 'FULL_TABLE'
 }
 TEST_USERS = {
@@ -56,7 +82,7 @@ PARAMS = (
 )
 
 ##########################################################################
-### Utils for retrieving existing test data 
+### Utils for retrieving existing test data
 ##########################################################################
 def get_replication_method(stream):
     if stream in REPLICATION_METHOD.keys():
@@ -76,7 +102,7 @@ def get_parent_stream(stream):
 
 def get_objects_users(obj_type: str='users', obj_id: str = "", parent_id: str = ""):
     """Get all members on a specific parent object, add that parent obj_id to the returned resp."""
-    print(" * Test Data |  Request: GET on /{}/{}".format(obj_type, obj_id))
+    logging.info(" * Test Data |  Request: GET on /{}/{}".format(obj_type, obj_id))
 
     if not parent_id: # needs to execute here so we can grab the board_id for the ret_val
         parent_id = get_random_object_id('boards')
@@ -84,12 +110,15 @@ def get_objects_users(obj_type: str='users', obj_id: str = "", parent_id: str = 
     endpoint = get_url_string("get", obj_type, obj_id, parent_id)
     resp = requests.get(url=endpoint, headers=HEADERS, params=PARAMS)
 
-    if resp.status_code >= 400:
-        logging.warn("Request Failed {} \n    {}".format(resp.status_code, resp.text))
-
+    if resp.status_code == 429:
+        logging.error(f"Rate limit exceeded (429) for {endpoint}. /1/members/ endpoints have 900s rate limit window.")
         return None
 
-    # Add baord id as tap-defined field 'boardId'
+    if resp.status_code >= 400:
+        logging.warning("Request Failed {} \n    {}".format(resp.status_code, resp.text))
+        return None
+
+    # Add board id as tap-defined field 'boardId'
     user_objects = resp.json()
     for user in user_objects:
         user['boardId'] = parent_id
@@ -108,6 +137,27 @@ def get_objects(obj_type: str, obj_id: str = "", parent_id: str = "", since = No
     if obj_type == 'cards':
         return get_objects_cards(obj_id=obj_id, parent_id=parent_id, since=since, custom_fields=custom_fields)
 
+    # members API returns single object, not a list
+    if obj_type == 'members':
+        endpoint = get_url_string("get", obj_type, obj_id, parent_id)
+        parameters = PARAMS
+
+        logging.info(" * Test Data |  Request: GET on {}, with parameters: {}".format(endpoint, [p for p in parameters if p[0] not in ["key", "token"]]))
+
+        resp = requests.get(url=endpoint, headers=HEADERS, params=parameters)
+
+        if resp.status_code == 429:
+            logging.error(f"Rate limit exceeded (429) for {endpoint}. /1/members/ endpoints have 900s rate limit window.")
+            return None
+
+        if resp.status_code >= 400:
+            logging.warning("Request Failed {} \n    {}".format(resp.status_code, resp.text))
+            return None
+
+        # API returns a single object, wrap it in a list
+        member_obj = resp.json()
+        return [member_obj] if isinstance(member_obj, dict) else member_obj
+
     endpoint = get_url_string("get", obj_type, obj_id, parent_id)
     parameters = PARAMS
     if since:
@@ -119,15 +169,29 @@ def get_objects(obj_type: str, obj_id: str = "", parent_id: str = "", since = No
         parameters += (('fields', 'all'),)
         parameters += (('checkItem_fields', 'all'),)
 
-    print(" * Test Data |  Request: GET on {}, with parameters: {}".format(endpoint, [p for p in parameters if p[0] not in ["key", "token"]]))
+    logging.info(" * Test Data |  Request: GET on {}, with parameters: {}".format(endpoint, [p for p in parameters if p[0] not in ["key", "token"]]))
 
-    resp = requests.get(url=endpoint, headers=HEADERS, params=parameters)
-    if resp.status_code >= 400:
-        logging.warn("Request Failed {} \n    {}".format(resp.status_code, resp.text))
+    max_retries = 2
+    for attempt in range(max_retries):
+        resp = requests.get(url=endpoint, headers=HEADERS, params=parameters)
 
-        return None
+        if resp.status_code == 429:
+            if attempt < max_retries - 1:
+                wait_time = RATE_LIMIT_WAIT_TIME
+                logging.warning(f"Rate limit exceeded (429). Waiting {wait_time} seconds for rate limit window to reset... (attempt {attempt + 1}/{max_retries})")
+                sleep(wait_time)
+                continue
+            else:
+                logging.error(f"Rate limit exceeded after {max_retries} attempts. Giving up on {endpoint}")
+                return None
 
-    return resp.json()
+        if resp.status_code >= 400:
+            logging.warning("Request Failed {} \n    {}".format(resp.status_code, resp.text))
+            return None
+
+        return resp.json()
+
+    return None
 
 def get_objects_cards(obj_type="cards", obj_id: str = "", parent_id: str = "", since = None, custom_fields=False):
     """
@@ -135,7 +199,7 @@ def get_objects_cards(obj_type="cards", obj_id: str = "", parent_id: str = "", s
     -  or -
     get a specific obj by id
     """
-    print(" * Test Data |  Request: GET on /{}/{}".format(obj_type, obj_id))
+    logging.info(" * Test Data |  Request: GET on /{}/{}".format(obj_type, obj_id))
 
     endpoint = get_url_string("get", obj_type, obj_id, parent_id)
     if custom_fields:
@@ -147,35 +211,51 @@ def get_objects_cards(obj_type="cards", obj_id: str = "", parent_id: str = "", s
     if since:
         parameters = PARAMS + (('since', since),)
 
-    resp = requests.get(url=endpoint, headers=HEADERS, params=parameters)
-    if resp.status_code >= 400:
-        logging.warn("Request Failed {} \n    {}".format(resp.status_code, resp.text))
+    max_retries = 2
+    for attempt in range(max_retries):
+        resp = requests.get(url=endpoint, headers=HEADERS, params=parameters)
 
-        return None
-    add_to_resp = dict()
-    if custom_fields and len(resp.json()) == 1:
-        value = resp.json()[0].get('value', None)
-        if not value:
-            # more work needed for multiple lists(w/ options) cfields
-            resp_json = resp.json()[0]
-            option_id = resp_json.get('idValue')
-            list_id = resp_json.get('idCustomField')
-
-            endpoint = BASE_URL + '/customFields/{}/options/{}'.format(list_id, option_id)
-            resp_options = requests.get(url=endpoint, headers=HEADERS, params=parameters)
-            if resp_options.status_code >= 400:
-                logging.warn("Request Failed {} \n    {}".format(resp_options.status_code, resp_options.text))
+        if resp.status_code == 429:
+            if attempt < max_retries - 1:
+                wait_time = RATE_LIMIT_WAIT_TIME
+                logging.warning(f"Rate limit exceeded (429). Waiting {wait_time} seconds for rate limit window to reset... (attempt {attempt + 1}/{max_retries})")
+                sleep(wait_time)
+                continue
+            else:
+                logging.error(f"Rate limit exceeded after {max_retries} attempts. Giving up on {endpoint}")
                 return None
-            add_to_resp = {'option': resp_options.json().get('value').get('text')}
-            resp_json.update({'value': add_to_resp})
-            return [resp_json]
 
-    return resp.json()
+        if resp.status_code >= 400:
+            logging.warning("Request Failed {} \n    {}".format(resp.status_code, resp.text))
+            return None
+
+        add_to_resp = dict()
+        if custom_fields and len(resp.json()) == 1:
+            value = resp.json()[0].get('value', None)
+            if not value:
+                # more work needed for multiple lists(w/ options) cfields
+                resp_json = resp.json()[0]
+                option_id = resp_json.get('idValue')
+                list_id = resp_json.get('idCustomField')
+
+                endpoint = BASE_URL + '/customFields/{}/options/{}'.format(list_id, option_id)
+                resp_options = requests.get(url=endpoint, headers=HEADERS, params=parameters)
+                if resp_options.status_code >= 400:
+                    logging.warning("Request Failed {} \n    {}".format(resp_options.status_code, resp_options.text))
+                    return None
+                add_to_resp = {'option': resp_options.json().get('value').get('text')}
+                resp_json.update({'value': add_to_resp})
+                return [resp_json]
+
+        return resp.json()
+
+    return None
 
 
 def get_random_object_id(obj_type: str, parent_id: str = ""):
     """Return the id of a random object for a specified object_type"""
-    global PARENT_OBJECTS  #, LIST_OBJECTS
+    # Note: Do NOT use global PARENT_OBJECTS here, as it may contain the wrong parent type
+    # Always fetch fresh objects to ensure correct parent type
 
     if obj_type == 'users':
         user_ids = [user.get('id') for user in TEST_USERS.values()]
@@ -192,23 +272,13 @@ def get_random_object_id(obj_type: str, parent_id: str = ""):
         objects = get_objects(obj_type, parent_id=parent_id)
         random_object = objects[random.randint(0, len(objects) -1)]
         return random_object.get('id')
-        
 
-    elif obj_type == get_parent_stream(obj_type): # if boards
-        if not PARENT_OBJECTS: # if we have not already done a get on baords
-            PARENT_OBJECTS = get_objects(obj_type)
-
-        objects = PARENT_OBJECTS
-        random_object = objects[random.randint(0, len(objects) -1)]
-
-        return random_object.get('id')
-
-    # elif obj_type == 'lists':
-    # if not LIST_OBJECTS: # if we have not already done a get on baords
-        #     LIST_OBJECTS = get_objects(obj_type)
-        # objects = LIST_OBJECTS
-
+    # For top-level streams (boards, organizations), always fetch fresh to avoid using wrong parent type
     objects = get_objects(obj_type)
+    if objects is None or len(objects) == 0:
+        raise Exception(
+            f"No objects found for type '{obj_type}' when trying to get random object ID."
+        )
     random_object = objects[random.randint(0, len(objects) -1)]
 
     return random_object.get('id')
@@ -221,13 +291,13 @@ def get_url_string(req: str, obj_type: str, obj_id: str = "", parent_id: str = "
      :param obj_id: The specific id of a record in the stream you are making a request on.
      :param parent_id: The specific id of a record that is the parent of the stream you are making a request on.
                        If you do not specific a parent id, a random one will be selected if needed
-    eg. 
-    Get all actions for a given baord:
+    eg.
+    Get all actions for a given board:
         get_url_string(req='get', obj_type='actions', obj_id='', parent_id=<id-of-a-specific-board>)
     Create a card anywhere:
         get_url_string(req='post', obj_type='cards', obj_id='', parent_id='')
     """
-    
+
     url_string = BASE_URL
 
     if obj_type == 'boards': # TODO may need to parameterize a members parent obj here
@@ -269,6 +339,66 @@ def get_url_string(req: str, obj_type: str, obj_id: str = "", parent_id: str = "
             url_string += "/boards/{}/lists".format(parent_id)
         else:
             url_string += "/lists/{}".format(obj_id)
+    elif obj_type == 'board_memberships':
+        if req == 'get':
+            url_string += "/boards/{}/memberships".format(parent_id)
+        else:
+            url_string += "/boards/{}/memberships/{}".format(parent_id, obj_id)
+
+    elif obj_type == 'board_custom_fields':
+        if req == 'get':
+            url_string += "/boards/{}/customFields".format(parent_id)
+        else:
+            url_string += "/boards/{}/customFields/{}".format(parent_id, obj_id)
+
+    elif obj_type == 'board_labels':
+        if req == 'get':
+            url_string += "/boards/{}/labels".format(parent_id)
+        else:
+            url_string += "/boards/{}/labels/{}".format(parent_id, obj_id)
+
+    elif obj_type == 'card_attachments':
+        if req == 'get':
+            url_string += "/cards/{}/attachments".format(parent_id)
+        else:
+            url_string += "/cards/{}/attachments/{}".format(parent_id, obj_id)
+
+    elif obj_type == 'card_custom_field_items':
+        if req == 'get':
+            url_string += "/cards/{}/customFieldItems".format(parent_id)
+        else:
+            url_string += "/cards/{}/customFieldItems/{}".format(parent_id, obj_id)
+
+    elif obj_type == 'members':
+        if obj_id:
+            url_string += "/members/{}".format(obj_id)
+        else:
+            url_string += "/members/{}".format(parent_id)
+
+    elif obj_type == 'organizations':
+        if req == "get":
+            url_string += "/members/me/organizations/{}".format(obj_id)
+        else:
+            url_string += "/organizations/{}".format(obj_id)
+
+    elif obj_type == 'organization_actions':
+        if req == 'get':
+            url_string += "/organizations/{}/actions".format(parent_id) if not obj_id else "/organizations/{}/actions/{}".format(parent_id, obj_id)
+        else:
+            url_string += "/organizations/{}/actions/{}".format(parent_id, obj_id)
+
+    elif obj_type == 'organization_members':
+        if req == 'get':
+            url_string += "/organizations/{}/members".format(parent_id)
+        else:
+            url_string += "/organizations/{}/members/{}".format(parent_id, obj_id)
+
+    elif obj_type == 'organization_memberships':
+        if req == 'get':
+            url_string += "/organizations/{}/memberships".format(parent_id)
+        else:
+            url_string += "/organizations/{}/memberships/{}".format(parent_id, obj_id)
+
     else:
         raise NotImplementedError
 
@@ -277,15 +407,27 @@ def get_url_string(req: str, obj_type: str, obj_id: str = "", parent_id: str = "
 
 def get_total_record_count_and_objects(child_stream: str="", since = None):
     """
-    : param child_stream: 
+    : param child_stream:
     Return the count and all records of a given child stream
     """
-    global PARENT_OBJECTS
+    global PARENT_OBJECTS, CURRENT_PARENT_STREAM
 
     parent_stream = get_parent_stream(child_stream)
 
+    # Reset PARENT_OBJECTS if we're switching to a different parent stream type
+    if CURRENT_PARENT_STREAM != parent_stream:
+        logging.info(f" * Test Data | Switching parent stream from '{CURRENT_PARENT_STREAM}' to '{parent_stream}' for child stream '{child_stream}'")
+        PARENT_OBJECTS = []
+        CURRENT_PARENT_STREAM = parent_stream
+
     if not PARENT_OBJECTS:
+        logging.info(f" * Test Data | Loading parent objects for parent stream '{parent_stream}'")
         PARENT_OBJECTS = get_objects(obj_type=parent_stream, since=since)
+
+        if PARENT_OBJECTS is None:
+            raise Exception(f"Failed to fetch parent objects for stream '{parent_stream}'.")
+
+        logging.info(f" * Test Data | Loaded {len(PARENT_OBJECTS)} parent objects of type '{parent_stream}'")
 
     # If true, then this stream is top level so just need 1 get ^
     if parent_stream == child_stream:
@@ -295,6 +437,10 @@ def get_total_record_count_and_objects(child_stream: str="", since = None):
     existing_objects = []
     for obj in PARENT_OBJECTS:
         objects = get_objects(obj_type=child_stream, parent_id=obj.get('id'), since=since)
+
+        if objects is None:
+            raise Exception(f"Failed to fetch child objects for stream '{child_stream}' with parent_id '{obj.get('id')}' (parent_stream='{parent_stream}').")
+
         for obj in objects:
             already_tracked = False
             for e_obj in existing_objects:
@@ -311,7 +457,7 @@ def get_total_record_count_and_objects(child_stream: str="", since = None):
 ### Test Data
 ##########################################################################
 tstamp = dt.utcnow().timestamp() # this is used to genereate unique dat
-print(" * Test Data | INITIALIZING tstamp to {}".format(tstamp))
+logging.info(" * Test Data | INITIALIZING tstamp to {}".format(tstamp))
 
 def get_test_data():
     global tstamp
@@ -336,7 +482,7 @@ def get_test_data():
             "prefs_background": "blue",  # id of  background or oneof: blue, orange, green, red, purple, pink, lime, sky, grey
             "prefs_cardAging": "regular", # type of card aging on the board (if enabled) One of: pirate, regular. Default: regular
         },
-        "USERS": {"type": ""},  # {"fullName":"xae a12","username":"singersongwriterd42"} # TODO 
+        "USERS": {"type": ""},  # {"fullName":"xae a12","username":"singersongwriterd42"} # TODO
         "CARDS": {
             "name":"Card {}".format(tstamp),
             "desc": "This is a description.",
@@ -377,8 +523,8 @@ def update_object(obj_type: str, obj_id: str = '', parent_id: str = '', field_to
     """
     update an existing object in order to genereate a new 'actions' record
     """
-    print(" * Test Data | Request: PUT on /{}/".format(obj_type))
-    
+    logging.info(" * Test Data | Request: PUT on /{}/".format(obj_type))
+
     if not obj_id:
         obj_id = get_random_object_id(obj_type)
 
@@ -397,10 +543,10 @@ def update_object(obj_type: str, obj_id: str = '', parent_id: str = '', field_to
             data_to_update = {field_to_update: data.get(field_to_update)} # just change the name for baords (actions)
         data_to_update = {field_to_update: "admin"} # add member to a board for users
         endpoint = get_url_string("put", obj_type, obj_id, parent_id)
-        print(" * Test Data | Changing: {} ".format(data_to_update))
+        logging.info(" * Test Data | Changing: {} ".format(data_to_update))
         resp = requests.put(url=endpoint, headers=HEADERS, params=PARAMS, json=data_to_update)
         if resp.status_code >= 400:
-            logging.warn("Request Failed {} \n    {}".format(resp.status_code, resp.text))
+            logging.warning("Request Failed {} \n    {}".format(resp.status_code, resp.text))
             return None
 
         return resp.json()
@@ -415,7 +561,7 @@ def update_object_action(obj_id: str = ''):  #, field_to_update: str = 'name'):
     data = {"value": get_action_comment(update=True)}
     resp = requests.put(url=endpoint, headers=HEADERS, params=PARAMS, json=data)
     if resp.status_code >= 400:
-        logging.warn("Request Failed {} \n    {}".format(resp.status_code, resp.text))
+        logging.warning("Request Failed {} \n    {}".format(resp.status_code, resp.text))
         return None
 
     return resp.json()
@@ -426,7 +572,7 @@ def update_object_board(obj_id: str = '', field_to_update: str = 'name'):
         obj_id = get_random_object_id('boards')
 
     if obj_id == NEVER_DELETE_BOARD_ID:
-        logging.warn("Request Ignored |  You tried to change a board that other tests rely on |  " +\
+        logging.warning("Request Ignored |  You tried to change a board that other tests rely on |  " +\
                      "Board (id={}) should not be altered".format(NEVER_DELETE_BOARD_ID))
         raise Exception("We do not have enough boards. We are being forced to update board named 'NEVER DELETE'")
 
@@ -434,10 +580,10 @@ def update_object_board(obj_id: str = '', field_to_update: str = 'name'):
     if data:
         data_to_update = {field_to_update: data.get(field_to_update)}
         endpoint = get_url_string('put', 'boards', obj_id, '')
-        print(" * Test Data | Changing: {} ".format(data_to_update))
+        logging.info(" * Test Data | Changing: {} ".format(data_to_update))
         resp = requests.put(url=endpoint, headers=HEADERS, params=PARAMS, json=data_to_update)
         if resp.status_code >= 400:
-            logging.warn("Request Failed {} \n    {}".format(resp.status_code, resp.text))
+            logging.warning("Request Failed {} \n    {}".format(resp.status_code, resp.text))
             return None
 
         return resp.json()
@@ -456,12 +602,12 @@ def update_object_user(obj_id: str = '', parent_id: str = '', field_to_update: s
     if data:
         data_to_update = {field_to_update: "normal"} # add member to a board for users
         endpoint = get_url_string('put', 'users', obj_id, parent_id)
-        print(" * Test Data | Changing: {} ".format(data_to_update))
+        logging.info(" * Test Data | Changing: {} ".format(data_to_update))
         resp = requests.put(url=endpoint, headers=HEADERS, params=PARAMS, json=data_to_update)
         if resp.status_code >= 400:
-            logging.warn("Request Failed {} \n    {}".format(resp.status_code, resp.text))
+            logging.warning("Request Failed {} \n    {}".format(resp.status_code, resp.text))
             data_to_update = {field_to_update: "admin"} # add member to a board for users
-            print(" * Test Data | Changing: {} ".format(data_to_update))
+            logging.info(" * Test Data | Changing: {} ".format(data_to_update))
             resp = requests.put(url=endpoint, headers=HEADERS, params=PARAMS, json=data_to_update)
             if resp.status_code >= 400:
                 return None
@@ -521,9 +667,9 @@ def create_object_actions(recipient_stream: str = "boards", obj_id: str = "", ac
             while not obj_id or (obj_id == NEVER_DELETE_BOARD_ID) and attempts < 50:
                 obj_id = get_random_object_id(recipient_stream)
                 attempts += 1
-                
+
             if obj_id == NEVER_DELETE_BOARD_ID:
-                logging.warn("Request Ignored |  You tried to change a board that other tests rely on |  " +\
+                logging.warning("Request Ignored |  You tried to change a board that other tests rely on |  " +\
                              "Board (id={}) should not be altered".format(NEVER_DELETE_BOARD_ID))
                 raise Exception("We do not have enough boards. We are being forced to update board named 'NEVER DELETE'")
 
@@ -532,17 +678,17 @@ def create_object_actions(recipient_stream: str = "boards", obj_id: str = "", ac
 
     pot_fields_to_update = get_action_fields_by_stream().get(recipient_stream)
     field_to_update = pot_fields_to_update[random.randint(0, len(pot_fields_to_update) - 1)]
-    
+
     data = stream_to_data_mapping(recipient_stream)
     if data:
         if action_type == "comment":
             data_to_update = {field_to_update: get_action_comment()}
 
             endpoint = BASE_URL + "/{}/{}/actions/comments".format(recipient_stream, obj_id)
-            print(" * Test Data | Changing: {} ".format(data_to_update))
+            logging.info(" * Test Data | Changing: {} ".format(data_to_update))
             resp = requests.post(url=endpoint, headers=HEADERS, params=PARAMS, json=data_to_update)
             if resp.status_code >= 400:
-                logging.warn("Request Failed {} \n    {}".format(resp.status_code, resp.text))
+                logging.warning("Request Failed {} \n    {}".format(resp.status_code, resp.text))
 
                 return None
 
@@ -551,7 +697,7 @@ def create_object_actions(recipient_stream: str = "boards", obj_id: str = "", ac
             resp = requests.get(url=endpoint, headers=HEADERS, params=PARAMS)
 
             if resp.status_code >= 400:
-                logging.warn("Request Failed {} \n    {}".format(resp.status_code, resp.text))
+                logging.warning("Request Failed {} \n    {}".format(resp.status_code, resp.text))
                 return None
 
             parent_id = resp.json().get('id')
@@ -561,10 +707,10 @@ def create_object_actions(recipient_stream: str = "boards", obj_id: str = "", ac
             data_to_update = {field_to_update: data.get(field_to_update)} # just change the name for baords (actions)
 
             endpoint = get_url_string("put", recipient_stream, obj_id)
-            print(" * Test Data | Changing: {} ".format(data_to_update))
+            logging.info(" * Test Data | Changing: {} ".format(data_to_update))
             resp = requests.put(url=endpoint, headers=HEADERS, params=PARAMS, json=data_to_update)
             if resp.status_code >= 400:
-                logging.warn("Request Failed {} \n    {}".format(resp.status_code, resp.text))
+                logging.warning("Request Failed {} \n    {}".format(resp.status_code, resp.text))
 
                 return None
 
@@ -580,7 +726,7 @@ def create_object_actions(recipient_stream: str = "boards", obj_id: str = "", ac
 
 def create_object_boards(obj_type: str='boards'):
     global PARENT_OBJECTS
-    print(" * Test Data | Request: POST on /{}/".format(obj_type))
+    logging.info(" * Test Data | Request: POST on /{}/".format(obj_type))
 
     data = stream_to_data_mapping(obj_type)
     if data:
@@ -588,10 +734,10 @@ def create_object_boards(obj_type: str='boards'):
         resp = requests.post(url=endpoint, headers=HEADERS, params=PARAMS, json=data)
 
         if resp.status_code >= 400:
-            logging.warn("Request Failed {} \n    {}".format(resp.status_code, resp.text))
+            logging.warning("Request Failed {} \n    {}".format(resp.status_code, resp.text))
             return None
 
-        print(" * Test Data | Tracking {} object in PARENT_OBJECTS".format(obj_type))
+        logging.info(" * Test Data | Tracking {} object in PARENT_OBJECTS".format(obj_type))
         PARENT_OBJECTS.append(resp.json())
 
         return resp.json()
@@ -599,7 +745,7 @@ def create_object_boards(obj_type: str='boards'):
     raise NotImplementedError
 
 def create_object_lists(obj_type: str='lists', parent_id=''):
-    print(" * Test Data | Request: POST on /{}/".format(obj_type))
+    logging.info(" * Test Data | Request: POST on /{}/".format(obj_type))
 
     data = stream_to_data_mapping(obj_type)
     if data:
@@ -610,7 +756,7 @@ def create_object_lists(obj_type: str='lists', parent_id=''):
         resp = requests.post(url=endpoint, headers=HEADERS, params=PARAMS, json=data)
 
         if resp.status_code >= 400:
-            logging.warn("Request Failed {} \n    {}".format(resp.status_code, resp.text))
+            logging.warning("Request Failed {} \n    {}".format(resp.status_code, resp.text))
             return None
 
         return resp.json()
@@ -618,7 +764,7 @@ def create_object_lists(obj_type: str='lists', parent_id=''):
     raise NotImplementedError
 
 def create_object_cards(obj_type: str = 'cards', parent_id = '', custom = False, field_type = None):
-    print(" * Test Data | Request: POST on /{}/".format(obj_type))
+    logging.info(" * Test Data | Request: POST on /{}/".format(obj_type))
 
     data = stream_to_data_mapping(obj_type)
     if data:
@@ -635,7 +781,7 @@ def create_object_cards(obj_type: str = 'cards', parent_id = '', custom = False,
         resp = requests.post(url=endpoint, headers=HEADERS, params=PARAMS, json=data)
 
         if resp.status_code >= 400:
-            logging.warn("Request Failed {} \n    {}".format(resp.status_code, resp.text))
+            logging.warning("Request Failed {} \n    {}".format(resp.status_code, resp.text))
             return None
 
         return resp.json()
@@ -656,8 +802,27 @@ def create_object(obj_type, obj_id: str = "", parent_id: str = "",
 
     return that object or none if create fails
     """
+    uncreatable_streams = {
+        'board_memberships': 'Board memberships are created when users join boards',
+        'board_custom_fields': 'Custom fields cannot be easily created via API for testing',
+        'board_labels': 'Board labels are auto-generated when board is created',
+        'card_attachments': 'Card attachments require file upload which is complex for testing',
+        'card_custom_field_items': 'Custom field items require custom field setup',
+        'members': 'Members stream represents user memberships, not creatable',
+        'organization_actions': 'Actions are generated by updates to organizations',
+        'organization_members': 'Organization members are read-only, managed via memberships',
+        'organization_memberships': 'Organization memberships cannot be easily created for testing',
+        'checklists': 'Checklists require parent cards to be properly set up'
+    }
+
+    if obj_type in uncreatable_streams:
+        logging.info(" * Test Data | SKIPPING CREATE for {}: {}".format(obj_type, uncreatable_streams[obj_type]))
+        logging.info("Stream {} cannot be created directly via test utilities: {}".format(
+            obj_type, uncreatable_streams[obj_type]))
+        return None
+
     if obj_type == 'actions':
-        print(" * Test Data | DIRECT CREATES ARE UNAVAILABLE for {}. ".format(obj_type) +\
+        logging.info(" * Test Data | DIRECT CREATES ARE UNAVAILABLE for {}. ".format(obj_type) +\
               "UPDATING another stream to generate new record")
         if action_type:
             return create_object_actions('cards', obj_id=parent_id, action_type=action_type)
@@ -676,10 +841,15 @@ def create_object(obj_type, obj_id: str = "", parent_id: str = "",
         return create_object_lists(parent_id=parent_id)
 
     elif obj_type == 'users':
-        print(" * Test Data | CREATES ARE UNAVAILABLE for {}".format(obj_type))
+        logging.info(" * Test Data | CREATES ARE UNAVAILABLE for {}".format(obj_type))
         return update_object_user(obj_id=obj_id, parent_id=parent_id,)
 
-    print(" * Test Data | Request: POST on /{}/".format(obj_type))
+    elif obj_type == 'organizations':
+        logging.info(" * Test Data | SKIPPING CREATE for {}: Organizations already exist in test account".format(obj_type))
+        logging.info("Stream {} uses existing organizations from test account".format(obj_type))
+        return None
+
+    logging.info(" * Test Data | Request: POST on /{}/".format(obj_type))
 
     data = stream_to_data_mapping(obj_type)
 
@@ -689,7 +859,7 @@ def create_object(obj_type, obj_id: str = "", parent_id: str = "",
         resp = requests.post(url=endpoint, headers=HEADERS, params=PARAMS, json=data)
 
         if resp.status_code >= 400:
-            logging.warn("Request Failed {} \n    {}".format(resp.status_code, resp.text))
+            logging.warning("Request Failed {} \n    {}".format(resp.status_code, resp.text))
             return None
 
         return resp.json()
@@ -697,7 +867,7 @@ def create_object(obj_type, obj_id: str = "", parent_id: str = "",
     raise NotImplementedError
 
 def delete_object(obj_type, obj_id: str = "", parent_id: str = ""):
-    print(" * Test Data | Request: DELETE on /{}/".format(obj_type))
+    logging.info(" * Test Data | Request: DELETE on /{}/".format(obj_type))
     # TODO | WIP | do a delete for boards, then try for lists | can't delete actions or users
 
     # Don't delete that one board we don't want to delete because all users are on it
@@ -708,24 +878,25 @@ def delete_object(obj_type, obj_id: str = "", parent_id: str = ""):
             attempts += 1
 
     if obj_id == NEVER_DELETE_BOARD_ID:
-        logging.warn("Request Ignored |  You tried to delete a board that other tests rely on |  " +\
+        logging.warning("Request Ignored |  You tried to delete a board that other tests rely on |  " +\
                      "Board (id={}) should not be deleted".format(NEVER_DELETE_BOARD_ID))
         return None
 
     endpoint = get_url_string("delete", obj_type, obj_id, parent_id)
     resp = requests.delete(url=endpoint, headers=HEADERS, params=PARAMS)
     if resp.status_code >= 400:
-        logging.warn("Request Failed {} \n    {}".format(resp.status_code, resp.text))
+        logging.warning("Request Failed {} \n    {}".format(resp.status_code, resp.text))
         return None
 
     return resp.json()
 
 def reset_tracked_parent_objects():  # TODO Reset all tracked data if we end up tracking child streams
-    global PARENT_OBJECTS
-    PARENT_OBJECTS = ""
-    print(" * Test Data | RESETTING TRACKED PARENT OBJECTS")
+    global PARENT_OBJECTS, CURRENT_PARENT_STREAM
+    PARENT_OBJECTS = []
+    CURRENT_PARENT_STREAM = None
+    logging.info(" * Test Data | RESETTING TRACKED PARENT OBJECTS")
     return
-    
+
 ##########################################################################
 ### Methods for custom fields
 ##########################################################################
@@ -760,10 +931,10 @@ def create_custom_field(obj_type: str = "boards", obj_id : str = "", field_type 
                  "pos": "{}".format(random.randint(1,9999))},
             )
 
-    print(" * Test Data | Creating: {} on board {}".format(data.get('name'), obj_id))
+    logging.info(" * Test Data | Creating: {} on board {}".format(data.get('name'), obj_id))
     resp = requests.post(url=endpoint, headers=HEADERS, params=PARAMS, json=data)
     if resp.status_code >= 400:
-        logging.warn("Request Failed {} \n    {}".format(resp.status_code, resp.text))
+        logging.warning("Request Failed {} \n    {}".format(resp.status_code, resp.text))
         return None
     return resp.json()
 
@@ -781,13 +952,13 @@ def create_custom_field(obj_type: str = "boards", obj_id : str = "", field_type 
 #     return resp.json()
 
 def get_custom_fields(obj_type, obj_id):
-    print(" * Test Data | GET: get customFieldItems on {} {}".format(obj_type, obj_id))
+    logging.info(" * Test Data | GET: get customFieldItems on {} {}".format(obj_type, obj_id))
     endpoint = BASE_URL + "/{}/{}/customFields".format(obj_type, obj_id)
 
     resp = requests.get(url=endpoint, headers=HEADERS, params=PARAMS)
 
     if resp.status_code >= 400:
-        logging.warn("Request Failed {} \n    {}".format(resp.status_code, resp.text))
+        logging.warning("Request Failed {} \n    {}".format(resp.status_code, resp.text))
         return None
 
     return resp.json()
@@ -853,44 +1024,44 @@ if __name__ == "__main__":
 
     objects_to_test = ['boards'] # ['actions', 'boards', 'cards', 'lists', 'users', 'checklists']
 
-    print("********** Testing basic functions of utils **********")
+    logging.info("********** Testing basic functions of utils **********")
     if test_creates:
         for obj in objects_to_test:
-            print("Testing CREATE: {}".format(obj))
+            logging.info("Testing CREATE: {}".format(obj))
             created_obj = create_object(obj)
             if created_obj:
-                print("SUCCESS")
+                logging.info("SUCCESS")
                 if print_objects:
-                    print(created_obj)
+                    logging.info(created_obj)
                 continue
-            print("FAILED")
+            logging.warning("FAILED")
     if test_updates:
         for obj in objects_to_test:
-            print("Testing UPDATE: {}".format(obj))
+            logging.info("Testing UPDATE: {}".format(obj))
             updated_obj = update_object(obj)
             if updated_obj:
-                print("SUCCESS")
+                logging.info("SUCCESS")
                 if print_objects:
-                    print(updated_obj)
+                    logging.info(updated_obj)
                 continue
-            print("FAILED")
+            logging.warning("FAILED")
     if test_gets:
         for obj in objects_to_test:
-            print("Testing GET: {}".format(obj))
+            logging.info("Testing GET: {}".format(obj))
             existing_objs = get_objects(obj)
             if existing_objs:
-                print("SUCCESS")
+                logging.info("SUCCESS")
                 if print_objects:
-                    print(existing_objs)
+                    logging.info(existing_objs)
                 continue
-            print("FAILED")
+            logging.warning("FAILED")
     if test_deletes:
         for obj in objects_to_test:
-            print("Testing DELETE: {}".format(obj))
+            logging.info("Testing DELETE: {}".format(obj))
             deleted_obj = delete_object(obj)
             if deleted_obj:
-                print("SUCCESS")
+                logging.info("SUCCESS")
                 if print_objects:
-                    print(deleted_obj)
+                    logging.info(deleted_obj)
                 continue
-            print("FAILED")
+            logging.warning("FAILED")
