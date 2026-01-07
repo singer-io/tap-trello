@@ -456,12 +456,12 @@ def get_total_record_count_and_objects(child_stream: str="", since = None):
 ##########################################################################
 ### Test Data
 ##########################################################################
-tstamp = dt.utcnow().timestamp() # this is used to genereate unique dat
+tstamp = dt.utcnow().timestamp() # this is used to generate unique data
 logging.info(" * Test Data | INITIALIZING tstamp to {}".format(tstamp))
 
 def get_test_data():
     global tstamp
-    tstamp = dt.utcnow().timestamp() # this is used to genereate unique data
+    tstamp = dt.utcnow().timestamp() # this is used to generate unique data
 
     TEST_DATA = {
         "BOARDS": {
@@ -521,7 +521,7 @@ def get_test_data():
 ##########################################################################
 def update_object(obj_type: str, obj_id: str = '', parent_id: str = '', field_to_update: str = ''):
     """
-    update an existing object in order to genereate a new 'actions' record
+    update an existing object in order to generate a new 'actions' record
     """
     logging.info(" * Test Data | Request: PUT on /{}/".format(obj_type))
 
