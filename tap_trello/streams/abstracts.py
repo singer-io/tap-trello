@@ -83,7 +83,7 @@ class DateWindowPaginated:
     MAX_API_RESPONSE_SIZE = None
     params = {}
 
-    def _get_window_state(self):
+    def get_window_state(self):
         window_start = get_bookmark(self.state, self.stream_id, 'window_start')
         sub_window_end = get_bookmark(self.state, self.stream_id, 'sub_window_end')
         window_end = get_bookmark(self.state, self.stream_id, 'window_end')
@@ -118,23 +118,23 @@ class DateWindowPaginated:
 
     def get_records(self, format_values):
         """ Overrides the default get_records to provide date_window pagination and bookmarking. """
-        window_start, sub_window_end, window_end = self._get_window_state()
+        window_start, sub_window_end, window_end = self.get_window_state()
         window_start -= timedelta(milliseconds=1) # To make start inclusive
 
         if sub_window_end is not None:
-            for rec in self._paginate_window(window_start, sub_window_end, format_values):
+            for rec in self.paginate_window(window_start, sub_window_end, format_values):
                 yield rec
         else:
-            for rec in self._paginate_window(window_start, window_end, format_values):
+            for rec in self.paginate_window(window_start, window_end, format_values):
                 yield rec
 
 
-    def _update_bookmark(self, key, value):
+    def update_bookmark(self, key, value):
         singer.bookmarks.write_bookmark(
             self.state, self.stream_id, key, utils.strftime(value)
         )
 
-    def _paginate_window(self, window_start, window_end, format_values):
+    def paginate_window(self, window_start, window_end, format_values):
         sub_window_end = window_end
         while True:
             records = self.client.get(self._format_endpoint(format_values), params={"since": utils.strftime(window_start), # pylint: disable=no-member
@@ -153,7 +153,7 @@ class DateWindowPaginated:
                 # max_response_size, set the window_end to the last
                 # record's timestamp (inclusive) and try again.
                 sub_window_end = utils.strptime_to_utc(records[-1]["date"]) + timedelta(milliseconds=1)
-                self._update_bookmark("sub_window_end", sub_window_end)
+                self.update_bookmark("sub_window_end", sub_window_end)
                 singer.write_state(self.state)
             else:
                 LOGGER.info("%s - Finished syncing between %s and %s",
