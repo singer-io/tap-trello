@@ -79,6 +79,25 @@ This tap:
 
 ## Authentication
 
+This tap uses Trello's API Key and Token authentication method.
+
+### Obtaining API Credentials
+
+1. **Get your API Key:**
+   - Log in to your Trello account
+   - Visit https://trello.com/power-ups/admin
+   - Your API Key will be displayed on the page
+
+2. **Generate an API Token:**
+   - On the same Power-Ups admin page, click on the "Token" link next to your API Key
+   - Authorize the application to access your Trello account
+   - Copy the generated token (it remains valid until revoked)
+
+3. **Add credentials to your config:**
+   - Add both `api_key` and `api_token` to your `config.json` file
+
+For more information, see the [Trello API Documentation](https://developer.atlassian.com/cloud/trello/guides/rest-api/api-introduction/).
+
 ## Quick Start
 
 1. Install
@@ -110,6 +129,8 @@ This tap:
 
     ```json
     {
+        "api_key": "your_api_key_here",
+        "api_token": "your_api_token_here",
         "start_date": "2019-01-01T00:00:00Z",
         "user_agent": "tap-trello <api_user_email@your_company.com>",
         "request_timeout": 300
