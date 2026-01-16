@@ -9,7 +9,7 @@ from tap_trello.sync import sync
 
 LOGGER = singer.get_logger()
 
-REQUIRED_CONFIG_KEYS = ['consumer_key', 'consumer_secret', 'access_token', 'access_token_secret', 'start_date']
+REQUIRED_CONFIG_KEYS = ['api_key', 'api_token', 'start_date']
 
 
 def do_discover():

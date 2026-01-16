@@ -76,8 +76,8 @@ HEADERS = {
 DATE_FORMAT = "%Y-%m-%dT00:00:00Z"
 SINCE = dt.strftime(dt.utcnow(), DATE_FORMAT)
 PARAMS = (
-    ('key', '{}'.format(os.getenv('TAP_TRELLO_CONSUMER_KEY'))),
-    ('token', '{}'.format(os.getenv('TAP_TRELLO_TESTING_TOKEN'))),
+    ('key', '{}'.format(os.getenv('TAP_TRELLO_API_KEY'))),
+    ('token', '{}'.format(os.getenv('TAP_TRELLO_API_TOKEN'))),
     ('limit', '{}'.format(MAX_API_LIMIT)),
 )
 

@@ -16,10 +16,8 @@ class TrelloBaseTest(unittest.TestCase):
 
     def setUp(self):
         missing_envs = [x for x in [
-            "TAP_TRELLO_CONSUMER_KEY",
-            "TAP_TRELLO_CONSUMER_SECRET",
-            "TAP_TRELLO_ACCESS_TOKEN",
-            "TAP_TRELLO_ACCESS_TOKEN_SECRET",
+            "TAP_TRELLO_API_KEY",
+            "TAP_TRELLO_API_TOKEN",
         ] if os.getenv(x) == None]
         if len(missing_envs) != 0:
             raise Exception("Missing environment variables: {}".format(missing_envs))
@@ -32,10 +30,8 @@ class TrelloBaseTest(unittest.TestCase):
 
     def get_credentials(self):
         return {
-            'consumer_key': os.getenv('TAP_TRELLO_CONSUMER_KEY'),
-            'consumer_secret': os.getenv('TAP_TRELLO_CONSUMER_SECRET'),
-            'access_token': os.getenv('TAP_TRELLO_ACCESS_TOKEN'),
-            'access_token_secret': os.getenv('TAP_TRELLO_ACCESS_TOKEN_SECRET'),
+            'api_key': os.getenv('TAP_TRELLO_API_KEY'),
+            'api_token': os.getenv('TAP_TRELLO_API_TOKEN'),
         }
 
     def tap_name(self):
