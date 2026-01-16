@@ -1,4 +1,4 @@
-from typing import Any, Dict, Mapping, Optional, Tuple
+from typing import Any, Dict, Mapping, Optional
 
 import backoff
 import requests
@@ -63,11 +63,10 @@ class Client:
     def __exit__(self, exception_type, exception_value, traceback):
         self._session.close()
 
-    def authenticate(self, headers: Dict, params: Dict) -> Tuple[Dict, Dict]:
-        """Authenticates the request using API key and API token."""
+    def authenticate(self, params: Dict) -> None:
+        """Authenticates the request by adding API key and token to params."""
         params["key"] = self.config["api_key"]
         params["token"] = self.config["api_token"]
-        return headers, params
 
     def _get_member_id(self):
         resp = self.get('/members/me')
@@ -91,7 +90,7 @@ class Client:
         headers = headers or {}
         body = body or {}
         endpoint = endpoint or f"{self.base_url}/{path}"
-        headers, params = self.authenticate(headers, params)
+        self.authenticate(params)
         return self.__make_request(
             method, endpoint,
             headers=headers,
