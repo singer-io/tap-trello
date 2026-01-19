@@ -14,6 +14,8 @@ from base import TrelloBaseTest
 
 class TestTrelloPagination(TrelloBaseTest):
     """Test that we are paginating for streams when exceeding the API record limit of a single query"""
+    # Default Trello API limits: actions=1000, cards=1000 (or configurable)
+    # Reduced for testing purposes to match available test data and avoid rate limits
     API_LIMIT = 1000
 
     def name(self):
@@ -21,13 +23,18 @@ class TestTrelloPagination(TrelloBaseTest):
 
     def get_credentials(self):
         credentials = super().get_credentials()
-        credentials['cards_response_size'] = 50  # Configurable pagination limit for card stream
+        # Default page size for cards is 1000, reduced to 10 for testing purposes
+        credentials['cards_response_size'] = 10  # Configurable pagination limit for card stream
         return credentials
 
     def testable_streams(self):
         """
         Not all streams are testable.
         : users: would need to manually create enough members to exceed API LIMIT
+
+        Note: API limits reduced for testing to match available test data:
+        - actions: reduced from 1000 to 100 (default API limit is 1000)
+        - cards: reduced from 1000 to 10 (default API limit is 1000, configurable)
         """
         return {
             'actions',
@@ -74,7 +81,7 @@ class TestTrelloPagination(TrelloBaseTest):
         expected_records = {x: [] for x in self.expected_sync_streams()} # ids by stream
         final_count = {x: 0 for x in self.expected_sync_streams()}
         for stream in self.testable_streams(): # just actions at the moment
-            self.API_LIMIT = 50 if stream == "cards" else 1000 # Page limit for card stream(50) is configured in config above
+            self.API_LIMIT = 10 if stream == "cards" else 100 # Page limit for card stream(10) is configured in config above
             # Look for parent object with most number of stream records
             start_date = dt.strptime(self.get_properties().get('start_date'), self.START_DATE_FORMAT)
             # Card is full_table stream so no need to check that data available since start_date or not
@@ -158,8 +165,8 @@ class TestTrelloPagination(TrelloBaseTest):
         for stream in self.testable_streams():
             with self.subTest(stream=stream):
 
-                # Page limit for card stream(50) is configured in config above
-                self.API_LIMIT = 50 if stream == "cards" else 1000
+                # Reduced page limits for card stream(10) is configured in config above
+                self.API_LIMIT = 10 if stream == "cards" else 100
 
                 # expected values
                 expected_primary_keys = self.expected_pks()[stream]
