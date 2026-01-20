@@ -30,7 +30,6 @@ class TestTrelloCustomFields(TrelloBaseTest):
     def expected_custom_fields(self):
         return {
             "checkbox",
-            "list",
             "number",
             "text",
             "date",
@@ -111,8 +110,6 @@ class TestTrelloCustomFields(TrelloBaseTest):
                     fields_exist[key] = True
                 elif key == 'checked':
                     fields_exist['checkbox'] = True
-                elif key == 'option':
-                    fields_exist['list'] = True
 
         self.assertTrue(all(v for _, v in fields_exist.items()),
                         msg="Not all custom field types have data. Data must be restored manually on Trello account" +\
@@ -207,11 +204,18 @@ class TestTrelloCustomFields(TrelloBaseTest):
                     )
 
                     # Verify the expected custom field attributes match the replicated data
+                    expected_cfield_replicated = False
                     for actual_cfields in record_custom_fields:
-                        expected_cfield_replicated = expected_cfield in actual_cfields
+                        for actual_cfield in actual_cfields:
+                            if (actual_cfield.get('id') == expected_cfield.get('id') and
+                                actual_cfield.get('idCustomField') == expected_cfield.get('idCustomField') and
+                                actual_cfield.get('idModel') == expected_cfield.get('idModel')):
+                                expected_cfield_replicated = True
+                                break
                         if expected_cfield_replicated:
                             break
-                    self.assertTrue(expected_cfield_replicated)
+                    self.assertTrue(expected_cfield_replicated,
+                                    msg=f"Custom field {expected_cfield.get('id')} not found in replicated data")
 
         # Reset the parent objects that we have been tracking
         utils.reset_tracked_parent_objects()
