@@ -1,167 +1,188 @@
 import os
-import unittest
 
-from datetime import datetime as dt
-
-import tap_tester.connections as connections
-import tap_tester.menagerie as menagerie
+from tap_tester.base_suite_tests.base_case import BaseCase
 
 
-class TrelloBaseTest(unittest.TestCase):
-    """Base test class with common setup and utility methods for Trello tap tests"""
+class TrelloBaseTest(BaseCase):
+    """Setup expectations for test sub classes.
 
-    START_DATE = ""
-    START_DATE_FORMAT = "%Y-%m-%dT00:00:00Z"
-    TEST_TIME_FORMAT = "%Y-%m-%dT%H:%M:%S.%fZ"
+    Metadata describing streams. A bunch of shared methods that are used
+    in tap-tester tests. Shared tap-specific methods (as needed).
+    """
+    start_date = "2025-12-01T00:00:00Z"
+    PARENT_TAP_STREAM_ID = "parent-tap-stream-id"
 
-    def setUp(self):
-        missing_envs = [x for x in [
-            "TAP_TRELLO_API_KEY",
-            "TAP_TRELLO_API_TOKEN",
-        ] if os.getenv(x) == None]
-        if len(missing_envs) != 0:
-            raise Exception("Missing environment variables: {}".format(missing_envs))
-
-    def name(self):
-        return "tap_tester_trello_base_test"
-
-    def get_type(self):
-        return "platform.trello"
-
-    def get_credentials(self):
-        return {
-            'api_key': os.getenv('TAP_TRELLO_API_KEY'),
-            'api_token': os.getenv('TAP_TRELLO_API_TOKEN'),
-        }
-
-    def tap_name(self):
+    @staticmethod
+    def tap_name():
+        """The name of the tap."""
         return "tap-trello"
 
-    def get_properties(self):
+    @staticmethod
+    def get_type():
+        """The name of the tap."""
+        return "platform.trello"
+
+    @classmethod
+    def expected_metadata(cls):
+        """The expected streams and metadata about the streams."""
         return {
-            'start_date': dt.strftime(dt.utcnow(), self.START_DATE_FORMAT),
+            "actions": {
+                cls.PRIMARY_KEYS: { "id" },
+                cls.REPLICATION_METHOD: cls.INCREMENTAL,
+                cls.REPLICATION_KEYS: { "date" },
+                cls.OBEYS_START_DATE: False,
+                cls.API_LIMIT: 1000,
+                cls.PARENT_TAP_STREAM_ID: "boards"
+            },
+            "boards": {
+                cls.PRIMARY_KEYS: { "id" },
+                cls.REPLICATION_METHOD: cls.FULL_TABLE,
+                cls.REPLICATION_KEYS: set(),
+                cls.OBEYS_START_DATE: False,
+                cls.API_LIMIT: 1000,
+                cls.PARENT_TAP_STREAM_ID: None
+            },
+            "board_custom_fields": {
+                cls.PRIMARY_KEYS: { "id", "boardId"},
+                cls.REPLICATION_METHOD: cls.FULL_TABLE,
+                cls.REPLICATION_KEYS: set(),
+                cls.OBEYS_START_DATE: False,
+                cls.API_LIMIT: 1000,
+                cls.PARENT_TAP_STREAM_ID: "boards"
+            },
+            "board_labels": {
+                cls.PRIMARY_KEYS: { "id", "boardId"},
+                cls.REPLICATION_METHOD: cls.FULL_TABLE,
+                cls.REPLICATION_KEYS: set(),
+                cls.OBEYS_START_DATE: False,
+                cls.API_LIMIT: 1000,
+                cls.PARENT_TAP_STREAM_ID: "boards"
+            },
+            "board_memberships": {
+                cls.PRIMARY_KEYS: { "id", "boardId" },
+                cls.REPLICATION_METHOD: cls.FULL_TABLE,
+                cls.REPLICATION_KEYS: set(),
+                cls.OBEYS_START_DATE: False,
+                cls.API_LIMIT: 1000,
+                cls.PARENT_TAP_STREAM_ID: "boards"
+            },
+            "cards": {
+                cls.PRIMARY_KEYS: { "id" },
+                cls.REPLICATION_METHOD: cls.FULL_TABLE,
+                cls.REPLICATION_KEYS: set(),
+                cls.OBEYS_START_DATE: False,
+                cls.API_LIMIT: 1000,
+                cls.PARENT_TAP_STREAM_ID: "boards"
+            },
+            "card_attachments": {
+                cls.PRIMARY_KEYS: { "id", "card_id" },
+                cls.REPLICATION_METHOD: cls.FULL_TABLE,
+                cls.REPLICATION_KEYS: set(),
+                cls.OBEYS_START_DATE: False,
+                cls.API_LIMIT: 1000,
+                cls.PARENT_TAP_STREAM_ID: "cards"
+            },
+            "card_custom_field_items": {
+                cls.PRIMARY_KEYS: { "id", "card_id" },
+                cls.REPLICATION_METHOD: cls.FULL_TABLE,
+                cls.REPLICATION_KEYS: set(),
+                cls.OBEYS_START_DATE: False,
+                cls.API_LIMIT: 1000,
+                cls.PARENT_TAP_STREAM_ID: "cards"
+            },
+            "checklists": {
+                cls.PRIMARY_KEYS: { "id" },
+                cls.REPLICATION_METHOD: cls.FULL_TABLE,
+                cls.REPLICATION_KEYS: set(),
+                cls.OBEYS_START_DATE: False,
+                cls.API_LIMIT: 1000,
+                cls.PARENT_TAP_STREAM_ID: "boards"
+            },
+            "lists": {
+                cls.PRIMARY_KEYS: { "id" },
+                cls.REPLICATION_METHOD: cls.FULL_TABLE,
+                cls.REPLICATION_KEYS: set(),
+                cls.OBEYS_START_DATE: False,
+                cls.API_LIMIT: 1000,
+                cls.PARENT_TAP_STREAM_ID: "boards"
+            },
+            "members": {
+                cls.PRIMARY_KEYS: { "id" },
+                cls.REPLICATION_METHOD: cls.FULL_TABLE,
+                cls.REPLICATION_KEYS: set(),
+                cls.OBEYS_START_DATE: False,
+                cls.API_LIMIT: 1000,
+                cls.PARENT_TAP_STREAM_ID: "users"
+            },
+            "organizations": {
+                cls.PRIMARY_KEYS: { "id" },
+                cls.REPLICATION_METHOD: cls.FULL_TABLE,
+                cls.REPLICATION_KEYS: set(),
+                cls.OBEYS_START_DATE: False,
+                cls.API_LIMIT: 1000,
+                cls.PARENT_TAP_STREAM_ID: None
+            },
+            "organization_actions": {
+                cls.PRIMARY_KEYS: { "id", "organization_id" },
+                cls.REPLICATION_METHOD: cls.INCREMENTAL,
+                cls.REPLICATION_KEYS: { "date" },
+                cls.OBEYS_START_DATE: False,
+                cls.API_LIMIT: 1000,
+                cls.PARENT_TAP_STREAM_ID: "organizations"
+            },
+            "organization_members": {
+                cls.PRIMARY_KEYS: { "id", "organization_id" },
+                cls.REPLICATION_METHOD: cls.FULL_TABLE,
+                cls.REPLICATION_KEYS: set(),
+                cls.OBEYS_START_DATE: False,
+                cls.API_LIMIT: 1000,
+                cls.PARENT_TAP_STREAM_ID: "organizations"
+            },
+            "organization_memberships": {
+                cls.PRIMARY_KEYS: { "id", "organization_id" },
+                cls.REPLICATION_METHOD: cls.FULL_TABLE,
+                cls.REPLICATION_KEYS: set(),
+                cls.OBEYS_START_DATE: False,
+                cls.API_LIMIT: 1000,
+                cls.PARENT_TAP_STREAM_ID: "organizations"
+            },
+            "users": {
+                cls.PRIMARY_KEYS: { "id", "boardId" },
+                cls.REPLICATION_METHOD: cls.FULL_TABLE,
+                cls.REPLICATION_KEYS: set(),
+                cls.OBEYS_START_DATE: False,
+                cls.API_LIMIT: 1000,
+                cls.PARENT_TAP_STREAM_ID: "boards"
+            }
         }
 
-    def testable_streams(self):
-        return self.expected_check_streams().difference(self.untestable_streams())
+    @staticmethod
+    def get_credentials():
+        """Authentication information for the test account."""
+        credentials_dict = {}
+        creds = {'api_key': 'TAP_TRELLO_API_KEY', 'api_token': 'TAP_TRELLO_API_TOKEN'}
 
-    def untestable_streams(self):
-        return set()
+        for cred in creds:
+            credentials_dict[cred] = os.getenv(creds[cred])
 
-    def expected_check_streams(self):
-        return {
-            'actions',
-            'board_custom_fields',
-            'board_labels',
-            'board_memberships',
-            'boards',
-            'card_attachments',
-            'card_custom_field_items',
-            'cards',
-            'checklists',
-            'lists',
-            'members',
-            'organization_actions',
-            'organization_members',
-            'organization_memberships',
-            'organizations',
-            'users'
+        return credentials_dict
+
+    def get_properties(self, original: bool = True):
+        """Configuration of properties required for the tap."""
+        return_value = {
+            "start_date": "2022-07-01T00:00:00Z"
         }
+        if original:
+            return return_value
 
-    def expected_sync_streams(self):
-        return self.expected_check_streams()
+        return_value["start_date"] = self.start_date
+        return return_value
 
-    def expected_full_table_streams(self):
-        return {
-            'boards',
-            'board_custom_fields',
-            'board_labels',
-            'board_memberships',
-            'cards',
-            'card_attachments',
-            'card_custom_field_items',
-            'checklists',
-            'lists',
-            'members',
-            'organizations',
-            'organization_members',
-            'organization_memberships',
-            'users',
-        }
-
-    def expected_full_table_sync_streams(self):
-        return self.expected_full_table_streams()
-
-    def expected_incremental_streams(self):
-        return {
-            'actions',
-            'organization_actions'
-        }
-
-    def expected_pks(self):
-        return {
-            'actions': {"id"},
-            'boards': {"id"},
-            'board_custom_fields': {"id", "boardId"},
-            'board_labels': {"id", "boardId"},
-            'board_memberships': {"id", "boardId"},
-            'cards': {'id'},
-            'card_attachments': {"id", "card_id"},
-            'card_custom_field_items': {"id", "card_id"},
-            'checklists': {'id'},
-            'lists': {"id"},
-            'members': {"id"},
-            'organizations': {"id"},
-            'organization_actions': {"id", "organization_id"},
-            'organization_members': {"id", "organization_id"},
-            'organization_memberships': {"id", "organization_id"},
-            'users': {"id", "boardId"}
-        }
-
-    def expected_automatic_fields(self):
-        return {
-            'actions': {"id", "date"},
-            'boards': {"id"},
-            'board_custom_fields': {"id", "boardId"},
-            'board_labels': {"id", "boardId"},
-            'board_memberships': {"id", "boardId"},
-            'cards': {'id'},
-            'card_attachments': {"id", "card_id"},
-            'card_custom_field_items': {"id", "card_id"},
-            'checklists': {'id'},
-            'lists': {"id"},
-            'members': {"id"},
-            'organizations': {"id"},
-            'organization_actions': {"id", "organization_id", "date"},
-            'organization_members': {"id", "organization_id"},
-            'organization_memberships': {"id", "organization_id"},
-            'users': {"id", "boardId"}
-        }
-
-    def select_all_streams_and_fields(self, conn_id, catalogs, select_all_fields: bool = True):
-        """
-        Select all streams and optionally all fields within streams.
-
-        Args:
-            conn_id: Connection ID
-            catalogs: List of catalogs to select
-            select_all_fields: If False, only select automatic fields
-        """
-        for catalog in catalogs:
-            schema = menagerie.get_annotated_schema(conn_id, catalog['stream_id'])
-
-            non_selected_properties = []
-            if not select_all_fields:
-                # get a list of all properties so that none are selected
-                non_selected_properties = schema.get('annotated-schema', {}).get(
-                    'properties', {})
-                # remove properties that are automatic
-                for prop in self.expected_automatic_fields().get(catalog['stream_name'], []):
-                    if prop in non_selected_properties:
-                        del non_selected_properties[prop]
-            additional_md = []
-
-            connections.select_catalog_and_fields_via_metadata(
-                conn_id, catalog, schema, additional_md=additional_md,
-                non_selected_fields=non_selected_properties.keys()
-            )
+    def expected_parent_tap_stream(self, stream=None):
+        """return a dictionary with key of table name and value of parent stream"""
+        parent_stream = {
+            table: properties.get(self.PARENT_TAP_STREAM_ID, None)
+            for table, properties in self.expected_metadata().items()}
+        if not stream:
+            return parent_stream
+        return parent_stream[stream]
