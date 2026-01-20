@@ -205,7 +205,3 @@ class TestTrelloPagination(TrelloBaseTest):
 
         # Reset the parent objects that we have been tracking
         utils.reset_tracked_parent_objects()
-
-
-if __name__ == '__main__':
-    unittest.main()

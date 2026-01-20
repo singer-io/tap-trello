@@ -35,7 +35,3 @@ class TestTrelloDiscovery(TrelloBaseTest):
         diff = self.expected_check_streams().symmetric_difference(found_catalog_names)
         self.assertEqual(len(diff), 0, msg="discovered schemas do not match: {}".format(diff))
         logging.info("discovered schemas are OK")
-
-
-if __name__ == '__main__':
-    unittest.main()
