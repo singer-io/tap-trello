@@ -43,7 +43,7 @@ class TrelloBookMarkTest(BookmarkTest, TrelloBaseTest):
         a bookmark that will sync 2 records in sync 2 (plus any necessary look
         back data)"""
         new_bookmarks = {
-            "actions": {"date": "2026-01-20T14:51:29.834000Z"}
+            "actions": {"window_start": "2026-01-20T14:51:29.834000Z"}
         }
 
         return new_bookmarks
