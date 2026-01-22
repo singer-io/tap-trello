@@ -7,10 +7,8 @@ from tap_trello.streams import Cards
 
 DEFAULT_CONFIG = {
     "start_date": "dummy_st",
-    "access_token": "dummy_at",
-    "access_token_secret": "dummy_as",
-    "consumer_key": "dummy_ck",
-    "consumer_secret": "dummy_cs",
+    "api_key": "dummy_key",
+    "api_token": "dummy_token",
 }
 
 def mocked_get(status_code=None, json=None):

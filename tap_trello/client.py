@@ -1,11 +1,10 @@
-from typing import Any, Dict, Mapping, Optional, Tuple
+from typing import Any, Dict, Mapping, Optional
 
 import backoff
 import requests
 
 from requests import session
 from requests.exceptions import ChunkedEncodingError, ConnectionError, Timeout # pylint: disable=redefined-builtin
-from requests_oauthlib import OAuth1
 
 from singer import get_logger, metrics
 from tap_trello.exceptions import (ERROR_CODE_EXCEPTION_MAPPING,
@@ -56,14 +55,6 @@ class Client:
         self.base_url = "https://api.trello.com/1"
         config_request_timeout = config.get("request_timeout")
         self.request_timeout = float(config_request_timeout) if config_request_timeout else REQUEST_TIMEOUT
-
-        self.oauth = OAuth1(config['consumer_key'],
-                            client_secret=config['consumer_secret'],
-                            resource_owner_key=config['access_token'],
-                            resource_owner_secret=config['access_token_secret'],
-                            signature_method='HMAC-SHA1')
-        self._session.auth = self.oauth
-
         self._member_id = None
 
     def __enter__(self):
@@ -94,6 +85,8 @@ class Client:
         headers = headers or {}
         body = body or {}
         endpoint = endpoint or f"{self.base_url}/{path}"
+        params["key"] = self.config["api_key"]
+        params["token"] = self.config["api_token"]
         return self.__make_request(
             method, endpoint,
             headers=headers,

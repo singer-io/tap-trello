@@ -12,10 +12,8 @@ from tap_trello.exceptions import *
 default_config = {
     "base_url": "https://api.example.com",
     "request_timeout": 30,
-    "consumer_key": "consumer_key",
-    "consumer_secret": "consumer_secret",
-    "access_token": "access_token",
-    "access_token_secret": "access_token_secret",
+    "api_key": "test_api_key",
+    "api_token": "test_api_token",
 }
 
 DEFAULT_REQUEST_TIMEOUT = 300
