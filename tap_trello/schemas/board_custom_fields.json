@@ -1,0 +1,114 @@
+{
+    "type": "object",
+    "properties": {
+        "id": {
+            "type": [
+                "string"
+            ]
+        },
+        "boardId": {
+            "type": [
+                "string"
+            ]
+        },
+        "idModel": {
+            "type": [
+                "null",
+                "string"
+            ]
+        },
+        "modelType": {
+            "type": [
+                "null",
+                "string"
+            ]
+        },
+        "fieldGroup": {
+            "type": [
+                "null",
+                "string"
+            ]
+        },
+        "display": {
+            "type": "object",
+            "properties": {
+                "cardFront": {
+                    "type": [
+                        "null",
+                        "boolean"
+                    ]
+                }
+            }
+        },
+        "name": {
+            "type": [
+                "null",
+                "string"
+            ]
+        },
+        "pos": {
+            "type": [
+                "null",
+                "integer"
+            ]
+        },
+        "options": {
+            "type": [
+                "null",
+                "array"
+            ],
+            "items": {
+                "type": "object",
+                "properties": {
+                    "id": {
+                        "type": [
+                            "null",
+                            "string"
+                        ]
+                    },
+                    "idCustomField": {
+                        "type": [
+                            "null",
+                            "string"
+                        ]
+                    },
+                    "value": {
+                        "type": "object",
+                        "properties": {
+                            "text": {
+                                "type": [
+                                    "null",
+                                    "string"
+                                ]
+                            }
+                        }
+                    },
+                    "color": {
+                        "type": [
+                            "null",
+                            "string"
+                        ]
+                    },
+                    "pos": {
+                        "type": [
+                            "null",
+                            "integer"
+                        ]
+                    }
+                }
+            }
+        },
+        "type": {
+            "type": [
+                "null",
+                "string"
+            ]
+        },
+        "isSuggestedField": {
+            "type": [
+                "null",
+                "boolean"
+            ]
+        }
+    }
+}

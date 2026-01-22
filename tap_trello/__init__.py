@@ -1,32 +1,47 @@
+import json
+import sys
+
 import singer
-from singer import utils
-from singer.catalog import Catalog, write_catalog
-from tap_trello.discover import do_discover
-from tap_trello.sync import do_sync
-from tap_trello import streams
-from tap_trello.client import TrelloClient
+
+from tap_trello.client import Client
+from tap_trello.discover import discover
+from tap_trello.sync import sync
 
 LOGGER = singer.get_logger()
 
-@utils.handle_top_exception(LOGGER)
+REQUIRED_CONFIG_KEYS = ['api_key', 'api_token', 'start_date']
+
+
+def do_discover():
+    """
+    Discover and emit the catalog to stdout
+    """
+    LOGGER.info("Starting discover")
+    catalog = discover()
+    json.dump(catalog.to_dict(), sys.stdout, indent=2)
+    LOGGER.info("Finished discover")
+
+
+@singer.utils.handle_top_exception(LOGGER)
 def main():
-    required_config_keys = ['start_date', 'consumer_key', 'consumer_secret', 'access_token', 'access_token_secret']
-    args = singer.parse_args(required_config_keys)
+    """
+    Run the tap
+    """
+    parsed_args = singer.utils.parse_args(REQUIRED_CONFIG_KEYS)
+    state = {}
+    if parsed_args.state:
+        state = parsed_args.state
 
-    config = args.config  # pylint:disable=unused-variable
-    client = TrelloClient(config)  # pylint:disable=unused-variable
-    catalog = args.catalog or Catalog([])
-    state = args.state # pylint:disable=unused-variable
+    with Client(parsed_args.config) as client:
+        if parsed_args.discover:
+            do_discover()
+        elif parsed_args.catalog:
+            sync(
+                client=client,
+                config=parsed_args.config,
+                catalog=parsed_args.catalog,
+                state=state)
 
-    if args.properties and not args.catalog:
-        raise Exception("DEPRECATED: Use of the 'properties' parameter is not supported. Please use --catalog instead")
-
-    if args.discover:
-        LOGGER.info("Starting discovery mode")
-        catalog = do_discover()
-        write_catalog(catalog)
-    else:
-        do_sync(client, config, state, catalog)
 
 if __name__ == "__main__":
     main()

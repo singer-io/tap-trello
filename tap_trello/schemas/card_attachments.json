@@ -1,0 +1,79 @@
+{
+    "type": "object",
+    "properties": {
+        "id": {
+            "type": [
+                "string"
+            ]
+        },
+        "card_id": {
+            "type": [
+                "string"
+            ]
+        },
+        "bytes": {
+            "type": [
+                "null",
+                "string"
+            ]
+        },
+        "date": {
+            "type": [
+                "null",
+                "string"
+            ],
+            "format": "date-time"
+        },
+        "edgeColor": {
+            "type": [
+                "null",
+                "string"
+            ]
+        },
+        "idMember": {
+            "type": [
+                "null",
+                "string"
+            ]
+        },
+        "isUpload": {
+            "type": [
+                "null",
+                "boolean"
+            ]
+        },
+        "mimeType": {
+            "type": [
+                "null",
+                "string"
+            ]
+        },
+        "name": {
+            "type": [
+                "null",
+                "string"
+            ]
+        },
+        "previews": {
+            "type": [
+                "null",
+                "array"
+            ],
+            "items": {
+                "type": "string"
+            }
+        },
+        "url": {
+            "type": [
+                "null",
+                "string"
+            ]
+        },
+        "pos": {
+            "type": [
+                "null",
+                "integer"
+            ]
+        }
+    }
+}

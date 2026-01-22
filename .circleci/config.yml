@@ -21,7 +21,7 @@ jobs:
           name: 'pylint'
           command: |
             source /usr/local/share/virtualenvs/tap-trello/bin/activate
-            pylint tap_trello --disable 'broad-except,chained-comparison,empty-docstring,fixme,invalid-name,line-too-long,missing-class-docstring,missing-function-docstring,missing-module-docstring,no-else-raise,no-else-return,too-few-public-methods,too-many-arguments,too-many-branches,too-many-lines,too-many-locals,ungrouped-imports,wrong-spelling-in-comment,wrong-spelling-in-docstring,consider-using-f-string,unspecified-encoding,broad-exception-raised,use-yield-from'
+            pylint tap_trello -d C,R,W
       - run:
           name: 'Unit Tests'
           command: |
@@ -38,8 +38,9 @@ jobs:
           command: |
             source /usr/local/share/virtualenvs/tap-tester/bin/activate
             uv pip install --upgrade awscli
-            aws s3 cp s3://com-stitchdata-dev-deployment-assets/environments/tap-tester/sandbox dev_env.sh
+            aws s3 cp s3://com-stitchdata-dev-deployment-assets/environments/tap-tester/tap_tester_sandbox dev_env.sh
             source dev_env.sh
+            unset USE_STITCH_BACKEND
             run-test --tap=tap-trello tests
 
 workflows:

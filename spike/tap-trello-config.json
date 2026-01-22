@@ -1,0 +1,143 @@
+{
+  "tap_name": "Trello",
+  "required_config_keys": ["consumer_key", "consumer_secret", "access_token", "access_token_secret", "start_date"],
+  "page_size": 1000,
+  "next_page_key": "page",
+  "pagination_key": "page",
+  "headers": {"Accept": "application/json"},
+  "params": {},
+  "auth_header_key": "oauth1",
+  "auth_config_key": {
+    "consumer_key": "consumer_key",
+    "consumer_secret": "consumer_secret",
+    "access_token": "access_token",
+    "access_token_secret": "access_token_secret"
+  },
+  "base_url": "https://api.trello.com/1",
+  "streams": [
+        {
+            "name": "board_memberships",
+            "key_properties": ["id", "boardId"],
+            "replication_method": "FULL_TABLE",
+            "replication_keys": null,
+            "data_key": null,
+            "path": "/boards/{id}/memberships",
+            "parent": "boards",
+            "children": [],
+            "doc_link": "https://developer.atlassian.com/cloud/trello/rest/api-group-boards/#api-boards-id-memberships-get"
+        },
+        {
+            "name": "board_custom_fields",
+            "key_properties": ["id", "boardId"],
+            "replication_method": "FULL_TABLE",
+            "replication_keys": null,
+            "data_key": null,
+            "path": "/boards/{id}/customFields",
+            "parent": null,
+            "children": [],
+            "doc_link": "https://developer.atlassian.com/cloud/trello/rest/api-group-boards/#api-boards-id-customfields-get"
+        },
+        {
+            "name": "board_labels",
+            "key_properties": ["id", "boardId"],
+            "replication_method": "FULL_TABLE",
+            "replication_keys": null,
+            "data_key": null,
+            "path": "/boards/{id}/labels",
+            "parent": "boards",
+            "children": [],
+            "doc_link": "https://developer.atlassian.com/cloud/trello/rest/api-group-boards/#api-boards-id-labels-get"
+        },
+        {
+            "name": "card_attachments",
+            "key_properties": ["id", "card_id"],
+            "replication_method": "FULL_TABLE",
+            "replication_keys": null,
+            "data_key": null,
+            "path": "/cards/{id}/attachments",
+            "parent": "cards",
+            "children": [],
+            "doc_link": "https://developer.atlassian.com/cloud/trello/rest/api-group-cards/#api-cards-id-attachments-get"
+        },
+        {
+            "name": "card_custom_field_items",
+            "key_properties": ["id", "card_id"],
+            "replication_method": "FULL_TABLE",
+            "replication_keys": null,
+            "data_key": null,
+            "path": "/cards/{id}/customFieldItems",
+            "parent": "cards",
+            "children": [],
+            "doc_link": "https://developer.atlassian.com/cloud/trello/rest/api-group-cards/#api-cards-id-customfielditems-get"
+        },
+        {
+            "name": "members",
+            "key_properties": ["id"],
+            "replication_method": "FULL_TABLE",
+            "replication_keys": null,
+            "data_key": null,
+            "path": "/members/{id}",
+            "parent": "users",
+            "children": [],
+            "doc_link": "https://developer.atlassian.com/cloud/trello/rest/api-group-members/#api-members-id-get"
+        },
+        {
+            "name": "organizations",
+            "key_properties": ["id"],
+            "replication_method": "FULL_TABLE",
+            "replication_keys": null,
+            "data_key": null,
+            "path": "/members/me/organizations",
+            "parent": null,
+            "children": [],
+            "doc_link": "https://developer.atlassian.com/cloud/trello/rest/api-group-organizations/#api-organizations-id-get"
+        },
+        {
+            "name": "organization_actions",
+            "key_properties": ["id", "organization_id"],
+            "replication_method": "INCREMENTAL",
+            "replication_keys": [
+                "date"
+            ],
+            "data_key": null,
+            "path": "/organizations/{id}/actions",
+            "parent": "organizations",
+            "children": [],
+            "doc_link": "https://developer.atlassian.com/cloud/trello/rest/api-group-organizations/#api-organizations-id-actions-get"
+        },
+        {
+            "name": "organization_members",
+            "key_properties": ["id", "organization_id"],
+            "replication_method": "FULL_TABLE",
+            "replication_keys": null,
+            "data_key": null,
+            "path": "/organizations/{id}/members",
+            "parent": "organizations",
+            "children": [],
+            "doc_link": "https://developer.atlassian.com/cloud/trello/rest/api-group-organizations/#api-organizations-id-members-get"
+        },
+        {
+            "name": "organization_memberships",
+            "key_properties": ["id", "organization_id"],
+            "replication_method": "FULL_TABLE",
+            "replication_keys": null,
+            "data_key": null,
+            "path": "/organizations/{id}/memberships",
+            "parent": "organizations",
+            "children": [],
+            "doc_link": "https://developer.atlassian.com/cloud/trello/rest/api-group-organizations/#api-organizations-id-memberships-get"
+        }
+    ],
+    "tap_tester_creds": {
+        "consumer_key": "TAP_TRELLO_CONSUMER_KEY",
+        "consumer_secret": "TAP_TRELLO_CONSUMER_SECRET",
+        "access_token": "TAP_TRELLO_ACCESS_TOKEN",
+        "access_token_secret": "TAP_TRELLO_ACCESS_TOKEN_SECRET"
+    },
+    "author": "Stitch",
+    "third_party_dependencies": [
+        "singer-python==6.3.0",
+        "requests==2.32.5",
+        "backoff==2.2.1"
+    ]
+}

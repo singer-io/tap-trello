@@ -1,0 +1,498 @@
+{
+    "type": "object",
+    "additionalProperties": true,
+    "properties": {
+        "id": {
+            "type": [
+                "string"
+            ]
+        },
+        "aaId": {
+            "type": [
+                "null",
+                "string"
+            ]
+        },
+        "activityBlocked": {
+            "type": [
+                "null",
+                "boolean"
+            ]
+        },
+        "avatarHash": {
+            "type": [
+                "null",
+                "string"
+            ]
+        },
+        "avatarUrl": {
+            "type": [
+                "null",
+                "string"
+            ]
+        },
+        "bio": {
+            "type": [
+                "null",
+                "string"
+            ]
+        },
+        "bioData": {
+            "type": [
+                "null",
+                "object"
+            ],
+            "properties": {
+                "emoji": {
+                    "type": [
+                        "null",
+                        "object"
+                    ],
+                    "properties": {}
+                }
+            },
+            "additionalProperties": true
+        },
+        "confirmed": {
+            "type": [
+                "null",
+                "boolean"
+            ]
+        },
+        "fullName": {
+            "type": [
+                "null",
+                "string"
+            ]
+        },
+        "idEnterprise": {
+            "type": [
+                "null",
+                "string"
+            ]
+        },
+        "idEnterprisesDeactivated": {
+            "type": [
+                "null",
+                "array"
+            ],
+            "items": {
+                "type": "string"
+            }
+        },
+        "idMemberReferrer": {
+            "type": [
+                "null",
+                "string"
+            ]
+        },
+        "idPremOrgsAdmin": {
+            "type": [
+                "null",
+                "array"
+            ],
+            "items": {
+                "type": "string"
+            }
+        },
+        "initials": {
+            "type": [
+                "null",
+                "string"
+            ]
+        },
+        "memberType": {
+            "type": [
+                "null",
+                "string"
+            ]
+        },
+        "nonPublic": {
+            "type": "object",
+            "properties": {
+                "fullName": {
+                    "type": [
+                        "null",
+                        "string"
+                    ]
+                },
+                "initials": {
+                    "type": [
+                        "null",
+                        "string"
+                    ]
+                },
+                "avatarUrl": {
+                    "type": [
+                        "null",
+                        "string"
+                    ]
+                },
+                "avatarHash": {
+                    "type": [
+                        "null",
+                        "string"
+                    ]
+                }
+            },
+            "additionalProperties": true
+        },
+        "nonPublicAvailable": {
+            "type": [
+                "null",
+                "boolean"
+            ]
+        },
+        "products": {
+            "type": [
+                "null",
+                "array"
+            ],
+            "items": {
+                "type": "integer"
+            }
+        },
+        "url": {
+            "type": [
+                "null",
+                "string"
+            ]
+        },
+        "username": {
+            "type": [
+                "null",
+                "string"
+            ]
+        },
+        "dateLastImpression": {
+            "type": [
+                "null",
+                "string"
+            ],
+            "format": "date-time"
+        },
+        "status": {
+            "type": [
+                "null",
+                "string"
+            ]
+        },
+        "aaBlockSyncUntil": {
+            "type": [
+                "null",
+                "string"
+            ]
+        },
+        "aaEmail": {
+            "type": [
+                "null",
+                "string"
+            ]
+        },
+        "aaEnrolledDate": {
+            "type": [
+                "null",
+                "string"
+            ],
+            "format": "date-time"
+        },
+        "avatarSource": {
+            "type": [
+                "null",
+                "string"
+            ]
+        },
+        "credentialsRemovedCount": {
+            "type": [
+                "null",
+                "integer"
+            ]
+        },
+        "dateLastActive": {
+            "type": [
+                "null",
+                "string"
+            ],
+            "format": "date-time"
+        },
+        "domainClaimed": {
+            "type": [
+                "null",
+                "string"
+            ]
+        },
+        "email": {
+            "type": [
+                "null",
+                "string"
+            ]
+        },
+        "gravatarHash": {
+            "type": [
+                "null",
+                "string"
+            ]
+        },
+        "idBoards": {
+            "type": [
+                "null",
+                "array"
+            ],
+            "items": {
+                "type": [
+                    "null",
+                    "string"
+                ]
+            }
+        },
+        "idOrganizations": {
+            "type": [
+                "null",
+                "array"
+            ],
+            "items": {
+                "type": [
+                    "null",
+                    "string"
+                ]
+            }
+        },
+        "idEnterprisesAdmin": {
+            "type": [
+                "null",
+                "array"
+            ],
+            "items": {
+                "type": "string"
+            }
+        },
+        "limits": {
+            "type": "object",
+            "properties": {
+                "status": {
+                    "type": [
+                        "null",
+                        "string"
+                    ]
+                },
+                "disableAt": {
+                    "type": [
+                        "null",
+                        "integer"
+                    ]
+                },
+                "warnAt": {
+                    "type": [
+                        "null",
+                        "integer"
+                    ]
+                }
+            },
+            "additionalProperties": true
+        },
+        "loginTypes": {
+            "type": [
+                "null",
+                "array"
+            ],
+            "items": {
+                "type": "string"
+            }
+        },
+        "marketingOptIn": {
+            "type": [
+                "null",
+                "object"
+            ],
+            "properties": {
+                "optedIn": {
+                    "type": [
+                        "null",
+                        "boolean"
+                    ]
+                },
+                "date": {
+                    "type": [
+                        "null",
+                        "string"
+                    ],
+                    "format": "date-time"
+                }
+            },
+            "additionalProperties": true
+        },
+        "messagesDismissed": {
+            "type": [
+                "null",
+                "array"
+            ],
+            "items": {
+                "type": "object",
+                "properties": {
+                    "_id": {
+                        "type": [
+                            "null",
+                            "string"
+                        ]
+                    },
+                    "name": {
+                        "type": [
+                            "null",
+                            "string"
+                        ]
+                    },
+                    "count": {
+                        "type": [
+                            "null",
+                            "integer"
+                        ]
+                    },
+                    "lastDismissed": {
+                        "type": [
+                            "null",
+                            "string"
+                        ],
+                        "format": "date-time"
+                    }
+                }
+            }
+        },
+        "nodeId": {
+            "type": [
+                "null",
+                "string"
+            ]
+        },
+        "oneTimeMessagesDismissed": {
+            "type": [
+                "null",
+                "array"
+            ],
+            "items": {
+                "type": [
+                    "null",
+                    "string"
+                ]
+            }
+        },
+        "sessionType": {
+            "type": [
+                "null",
+                "string"
+            ]
+        },
+        "prefs": {
+            "type": [
+                "null",
+                "object"
+            ],
+            "properties": {
+                "sendSummaries": {
+                    "type": [
+                        "null",
+                        "boolean"
+                    ]
+                },
+                "minutesBetweenSummaries": {
+                    "type": [
+                        "null",
+                        "integer"
+                    ]
+                },
+                "minutesBeforeDeadlineToNotify": {
+                    "type": [
+                        "null",
+                        "integer"
+                    ]
+                },
+                "colorBlind": {
+                    "type": [
+                        "null",
+                        "boolean"
+                    ]
+                },
+                "keyboardShortcutsEnabled": {
+                    "type": [
+                        "null",
+                        "boolean"
+                    ]
+                },
+                "locale": {
+                    "type": [
+                        "null",
+                        "string"
+                    ]
+                },
+                "privacy": {
+                    "type": "object",
+                    "properties": {
+                        "fullName": {
+                            "type": [
+                                "null",
+                                "string"
+                            ]
+                        },
+                        "avatar": {
+                            "type": [
+                                "null",
+                                "string"
+                            ]
+                        }
+                    },
+                    "additionalProperties": true
+                }
+            }
+        },
+        "trophies": {
+            "type": [
+                "null",
+                "array"
+            ],
+            "items": {
+                "type": "string"
+            }
+        },
+        "uploadedAvatarHash": {
+            "type": [
+                "null",
+                "string"
+            ]
+        },
+        "uploadedAvatarUrl": {
+            "type": [
+                "null",
+                "string"
+            ]
+        },
+        "premiumFeatures": {
+            "type": [
+                "null",
+                "array"
+            ],
+            "items": {
+                "type": "string"
+            }
+        },
+        "isAaMastered": {
+            "type": [
+                "null",
+                "boolean"
+            ]
+        },
+        "ixUpdate": {
+            "type": [
+                "null",
+                "string"
+            ]
+        },
+        "idBoardsPinned": {
+            "type": [
+                "null",
+                "array"
+            ],
+            "items": {
+                "type": "string"
+            }
+        }
+    }
+}

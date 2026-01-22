@@ -1,52 +1,39 @@
-import os
-import json
-
+import singer
 from singer import metadata
-from singer.catalog import Catalog
-from .streams import STREAM_OBJECTS
+from singer.catalog import Catalog, CatalogEntry, Schema
+
+from tap_trello.schema import get_schemas
+
+LOGGER = singer.get_logger()
 
 
-def _get_abs_path(path):
-    return os.path.join(os.path.dirname(os.path.realpath(__file__)), path)
+def discover() -> Catalog:
+    """
+    Run the discovery mode, prepare the catalog file and return the catalog.
+    """
+    schemas, field_metadata = get_schemas()
+    catalog = Catalog([])
 
+    for stream_name, schema_dict in schemas.items():
+        try:
+            schema = Schema.from_dict(schema_dict)
+            mdata = field_metadata[stream_name]
+        except Exception as err:
+            LOGGER.error(err)
+            LOGGER.error("stream_name: {}".format(stream_name))
+            LOGGER.error("type schema_dict: {}".format(type(schema_dict)))
+            raise err
 
-# Load schemas from schemas folder
-def _load_schemas():
-    schemas = {}
+        key_properties = metadata.to_map(mdata).get((), {}).get("table-key-properties")
 
-    for filename in os.listdir(_get_abs_path("schemas")):
-        path = _get_abs_path("schemas") + "/" + filename
-        file_raw = filename.replace(".json", "")
-        with open(path) as file:
-            schemas[file_raw] = json.load(file)
-
-    return schemas
-
-
-def do_discover():
-    raw_schemas = _load_schemas()
-    catalog_entries = []
-
-    for stream_name, schema in raw_schemas.items():
-        # create and add catalog entry
-        stream = STREAM_OBJECTS[stream_name]
-        mdata = metadata.get_standard_metadata(
-            schema=schema,
-            key_properties=stream.key_properties,
-            valid_replication_keys=stream.replication_keys,
-            replication_method=stream.replication_method,
+        catalog.streams.append(
+            CatalogEntry(
+                stream=stream_name,
+                tap_stream_id=stream_name,
+                key_properties=key_properties,
+                schema=schema,
+                metadata=mdata,
+            )
         )
-        mdata = metadata.to_map(mdata)
-        for field_name in stream.replication_keys:
-            metadata.write(mdata, ('properties', field_name), 'inclusion', 'automatic')
 
-        catalog_entry = {
-            "stream": stream_name,
-            "tap_stream_id": stream_name,
-            "schema": schema,
-            "metadata": metadata.to_list(mdata),
-            "key_properties": stream.key_properties,
-        }
-        catalog_entries.append(catalog_entry)
-
-    return Catalog.from_dict({"streams": catalog_entries})
+    return catalog
