@@ -175,4 +175,3 @@ class TrelloStartDateTest(StartDateTest, TrelloBaseTest):
 
                     # Verify by primary key the same records are replicated in the 1st and 2nd syncs
                     self.assertSetEqual(primary_keys_sync_1, primary_keys_sync_2)
-
