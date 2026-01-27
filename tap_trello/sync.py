@@ -119,7 +119,7 @@ def sync(client: Client, config: Dict, catalog: singer.Catalog, state) -> None:
                         transformed_record = transformer.transform(rec, schema_dict, metadata_map)
                         singer.write_record(stream_name, transformed_record)
                         counter.increment()
-                total_records = counter.value
+                    total_records = counter.value
             else:
                 # Latest streams: sync() handles everything and returns count
                 if parent_attribute:
