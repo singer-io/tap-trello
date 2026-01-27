@@ -36,7 +36,10 @@
             ]
         },
         "bioData": {
-            "type": "object",
+            "type": [
+                "null",
+                "object"
+            ],
             "properties": {
                 "emoji": {
                     "type": [
