@@ -56,6 +56,10 @@ class TrelloServiceUnavailableError(TrelloBackoffError):
     """class representing 503 status code."""
     pass
 
+class TrelloGatewayTimeoutError(TrelloBackoffError):
+    """class representing 504 status code."""
+    pass
+
 ERROR_CODE_EXCEPTION_MAPPING = {
     400: {
         "raise_exception": TrelloBadRequestError,
@@ -101,5 +105,14 @@ ERROR_CODE_EXCEPTION_MAPPING = {
     503: {
         "raise_exception": TrelloServiceUnavailableError,
         "message": "API service is currently unavailable."
+    },
+    504: {
+        "raise_exception": TrelloGatewayTimeoutError,
+        "message": "The server did not receive a timely response from an upstream server."
     }
+}
+
+DEFAULT_5XX_EXCEPTION = {
+    "raise_exception": TrelloBackoffError,
+    "message": "An unexpected server error occurred."
 }

@@ -8,11 +8,48 @@ from requests.exceptions import ChunkedEncodingError, ConnectionError, Timeout #
 
 from singer import get_logger, metrics
 from tap_trello.exceptions import (ERROR_CODE_EXCEPTION_MAPPING,
+                                   DEFAULT_5XX_EXCEPTION,
                                    TrelloError,
                                    TrelloBackoffError, TrelloRateLimitError)
 
 LOGGER = get_logger()
 REQUEST_TIMEOUT = 300
+
+
+def _log_backoff(details):
+    """Callback invoked by backoff before each retry attempt."""
+    LOGGER.warning(
+        "Retry attempt %d for %s after %.1fs wait. Exception: %s",
+        details.get("tries", 0),
+        details["args"][1] if len(details.get("args", [])) > 1 else "unknown endpoint",
+        details.get("wait", 0),
+        details.get("exception", "unknown"),
+    )
+
+
+def _log_giveup(details):
+    """Callback invoked by backoff when all retries are exhausted."""
+    LOGGER.error(
+        "Giving up after %d tries for %s. Final exception: %s",
+        details.get("tries", 0),
+        details["args"][1] if len(details.get("args", [])) > 1 else "unknown endpoint",
+        details.get("exception", "unknown"),
+    )
+
+
+def _get_exception_mapping(status_code):
+    """Return the exception mapping for a status code.
+
+    For unmapped 5xx codes (500-599), falls back to the default 5xx mapping
+    so that all server errors are retried via TrelloBackoffError.
+    """
+    mapping = ERROR_CODE_EXCEPTION_MAPPING.get(status_code)
+    if mapping:
+        return mapping
+    if 500 <= status_code < 600:
+        return DEFAULT_5XX_EXCEPTION
+    return {}
+
 
 def raise_for_error(response: requests.Response) -> None:
     """Raises the associated response exception. Takes in a response object,
@@ -26,16 +63,24 @@ def raise_for_error(response: requests.Response) -> None:
     except Exception:
         response_json = {}
     if response.status_code not in [200, 201, 204]:
+        mapping = _get_exception_mapping(response.status_code)
         if response_json.get("error"):
             message = f"HTTP-error-code: {response.status_code}, Error: {response_json.get('error')}"
         else:
-            error_message = ERROR_CODE_EXCEPTION_MAPPING.get(
-                response.status_code, {}
-            ).get("message", "Unknown Error")
+            error_message = mapping.get("message", "Unknown Error")
             message = f"HTTP-error-code: {response.status_code}, Error: {response_json.get('message', error_message)}"
-        exc = ERROR_CODE_EXCEPTION_MAPPING.get(response.status_code, {}).get(
-            "raise_exception", TrelloError
-        )
+
+        exc = mapping.get("raise_exception", TrelloError)
+
+        # Log 5xx errors with context before raising (they will be retried)
+        if 500 <= response.status_code < 600:
+            LOGGER.warning(
+                "Server error %d on %s: %s",
+                response.status_code,
+                getattr(response, 'url', 'unknown'),
+                message,
+            )
+
         raise exc(message, response) from None
 
 
@@ -107,6 +152,8 @@ class Client:
         ),
         max_tries=5,
         factor=2,
+        on_backoff=_log_backoff,
+        on_giveup=_log_giveup,
     )
     def __make_request(
         self, method: str, endpoint: str, **kwargs

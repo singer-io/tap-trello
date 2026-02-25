@@ -1,11 +1,11 @@
 import unittest
-from unittest.mock import patch
+from unittest.mock import patch, call
 
 import requests
 from parameterized import parameterized
 from requests.exceptions import Timeout, ConnectionError, ChunkedEncodingError
 
-from tap_trello.client import Client
+from tap_trello.client import Client, _log_backoff, _log_giveup
 from tap_trello.exceptions import *
 
 
@@ -32,6 +32,7 @@ class MockResponse:
         self.raise_error = raise_error
         self.text = text
         self.reason = "error"
+        self.url = "https://api.example.com/resource"
 
     def raise_for_status(self):
         """If an error occur, this method returns a HTTPError object.
@@ -109,6 +110,7 @@ class TestClient(unittest.TestCase):
         ["501 error", 501, MockResponse(501), TrelloNotImplementedError, "The server does not support the functionality required to fulfill the request."],
         ["502 error", 502, MockResponse(502), TrelloBadGatewayError, "Server received an invalid response."],
         ["503 error", 503, MockResponse(503), TrelloServiceUnavailableError, "API service is currently unavailable."],
+        ["504 error", 504, MockResponse(504), TrelloGatewayTimeoutError, "The server did not receive a timely response from an upstream server."],
     ])
     @patch("time.sleep")
     def test_make_request_http_failure_with_retry(self, test_name, error_code, mock_response, error, error_message, mock_sleep):
@@ -135,3 +137,59 @@ class TestClient(unittest.TestCase):
                 self.client._Client__make_request("GET", "https://api.example.com/resource")
 
             self.assertEqual(mock_request.call_count, 5)
+
+    @patch("time.sleep")
+    def test_unmapped_5xx_triggers_retry_via_catch_all(self, mock_sleep):
+        """Unmapped 5xx codes (e.g., 520) should raise TrelloBackoffError and be retried."""
+        mock_response = MockResponse(520)
+
+        with patch.object(self.client._session, "request", return_value=mock_response) as mock_request:
+            with self.assertRaises(TrelloBackoffError) as ctx:
+                self.client._Client__make_request("GET", "https://api.example.com/resource")
+
+            expected_message = "HTTP-error-code: 520, Error: An unexpected server error occurred."
+            self.assertEqual(str(ctx.exception), expected_message)
+            self.assertEqual(mock_request.call_count, 5)
+
+    @patch("tap_trello.client.LOGGER")
+    def test_log_backoff_callback(self, mock_logger):
+        """Verify _log_backoff logs a warning with retry details."""
+        details = {
+            "tries": 2,
+            "args": [None, "https://api.trello.com/1/boards"],
+            "wait": 4.0,
+            "exception": TrelloInternalServerError("test error"),
+        }
+        _log_backoff(details)
+        mock_logger.warning.assert_called_once()
+        log_args = mock_logger.warning.call_args
+        self.assertIn("Retry attempt 2", log_args[0][0] % log_args[0][1:])
+
+    @patch("tap_trello.client.LOGGER")
+    def test_log_giveup_callback(self, mock_logger):
+        """Verify _log_giveup logs an error with final failure details."""
+        details = {
+            "tries": 5,
+            "args": [None, "https://api.trello.com/1/boards"],
+            "exception": TrelloInternalServerError("test error"),
+        }
+        _log_giveup(details)
+        mock_logger.error.assert_called_once()
+        log_args = mock_logger.error.call_args
+        self.assertIn("Giving up after 5 tries", log_args[0][0] % log_args[0][1:])
+
+    @patch("tap_trello.client.LOGGER")
+    @patch("time.sleep")
+    def test_5xx_error_logged_before_retry(self, mock_sleep, mock_logger):
+        """Verify that 5xx errors are logged with endpoint context."""
+        mock_response = MockResponse(503)
+        mock_response.url = "https://api.trello.com/1/boards"
+
+        with patch.object(self.client._session, "request", return_value=mock_response) as mock_request:
+            with self.assertRaises(TrelloServiceUnavailableError):
+                self.client._Client__make_request("GET", "https://api.example.com/resource")
+
+        # raise_for_error logs a warning for each 5xx attempt
+        warning_calls = [c for c in mock_logger.warning.call_args_list
+                         if len(c[0]) > 1 and c[0][1] == 503]
+        self.assertGreaterEqual(len(warning_calls), 1)
