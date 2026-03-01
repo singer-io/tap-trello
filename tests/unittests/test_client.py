@@ -1,5 +1,5 @@
 import unittest
-from unittest.mock import patch, call
+from unittest.mock import patch
 
 import requests
 from parameterized import parameterized
