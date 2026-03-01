@@ -5,7 +5,7 @@ import requests
 from parameterized import parameterized
 from requests.exceptions import Timeout, ConnectionError, ChunkedEncodingError
 
-from tap_trello.client import Client, _log_backoff, _log_giveup
+from tap_trello.client import Client, _log_backoff, _log_giveup, _sanitize_url
 from tap_trello.exceptions import *
 
 
@@ -156,34 +156,38 @@ class TestClient(unittest.TestCase):
         """Verify _log_backoff logs a warning with retry details."""
         details = {
             "tries": 2,
-            "args": [None, "https://api.trello.com/1/boards"],
+            "args": [None, "GET", "https://api.trello.com/1/boards"],
             "wait": 4.0,
             "exception": TrelloInternalServerError("test error"),
         }
         _log_backoff(details)
         mock_logger.warning.assert_called_once()
         log_args = mock_logger.warning.call_args
-        self.assertIn("Retry attempt 2", log_args[0][0] % log_args[0][1:])
+        formatted = log_args[0][0] % log_args[0][1:]
+        self.assertIn("Retry attempt 2", formatted)
+        self.assertIn("https://api.trello.com/1/boards", formatted)
 
     @patch("tap_trello.client.LOGGER")
     def test_log_giveup_callback(self, mock_logger):
         """Verify _log_giveup logs an error with final failure details."""
         details = {
             "tries": 5,
-            "args": [None, "https://api.trello.com/1/boards"],
+            "args": [None, "GET", "https://api.trello.com/1/boards"],
             "exception": TrelloInternalServerError("test error"),
         }
         _log_giveup(details)
         mock_logger.error.assert_called_once()
         log_args = mock_logger.error.call_args
-        self.assertIn("Giving up after 5 tries", log_args[0][0] % log_args[0][1:])
+        formatted = log_args[0][0] % log_args[0][1:]
+        self.assertIn("Giving up after 5 tries", formatted)
+        self.assertIn("https://api.trello.com/1/boards", formatted)
 
     @patch("tap_trello.client.LOGGER")
     @patch("time.sleep")
     def test_5xx_error_logged_before_retry(self, mock_sleep, mock_logger):
-        """Verify that 5xx errors are logged with endpoint context."""
+        """Verify that 5xx errors are logged with sanitized endpoint context."""
         mock_response = MockResponse(503)
-        mock_response.url = "https://api.trello.com/1/boards"
+        mock_response.url = "https://api.trello.com/1/boards?key=secret_key&token=secret_token"
 
         with patch.object(self.client._session, "request", return_value=mock_response) as mock_request:
             with self.assertRaises(TrelloServiceUnavailableError):
@@ -193,3 +197,26 @@ class TestClient(unittest.TestCase):
         warning_calls = [c for c in mock_logger.warning.call_args_list
                          if len(c[0]) > 1 and c[0][1] == 503]
         self.assertGreaterEqual(len(warning_calls), 1)
+
+        # Verify credentials are NOT in the logged URL
+        for c in warning_calls:
+            logged_url = c[0][2]  # 3rd positional arg is the sanitized URL
+            self.assertNotIn("secret_key", logged_url)
+            self.assertNotIn("secret_token", logged_url)
+
+    def test_sanitize_url_strips_query_params(self):
+        """Verify _sanitize_url removes query parameters containing credentials."""
+        url = "https://api.trello.com/1/boards?key=abc123&token=xyz789"
+        sanitized = _sanitize_url(url)
+        self.assertEqual(sanitized, "https://api.trello.com/1/boards")
+        self.assertNotIn("abc123", sanitized)
+        self.assertNotIn("xyz789", sanitized)
+
+    def test_sanitize_url_handles_no_query(self):
+        """Verify _sanitize_url works correctly when there are no query params."""
+        url = "https://api.trello.com/1/boards"
+        self.assertEqual(_sanitize_url(url), url)
+
+    def test_sanitize_url_handles_invalid_input(self):
+        """Verify _sanitize_url returns 'unknown' for non-string input."""
+        self.assertEqual(_sanitize_url(None), "unknown")

@@ -1,4 +1,5 @@
 from typing import Any, Dict, Mapping, Optional
+from urllib.parse import urlparse, urlunparse
 
 import backoff
 import requests
@@ -16,12 +17,35 @@ LOGGER = get_logger()
 REQUEST_TIMEOUT = 300
 
 
+def _sanitize_url(url):
+    """Remove query parameters from a URL to avoid leaking credentials in logs."""
+    if not isinstance(url, str):
+        return "unknown"
+    try:
+        parsed = urlparse(url)
+        return urlunparse(parsed._replace(query="", fragment=""))
+    except Exception:
+        return "unknown"
+
+
+def _get_endpoint_from_details(details):
+    """Extract the endpoint from backoff callback details.
+
+    For Client.__make_request(self, method, endpoint, ...), the endpoint
+    is at args[2].  Falls back gracefully if the shape is unexpected.
+    """
+    args = details.get("args", ())
+    if len(args) > 2:
+        return args[2]
+    return "unknown endpoint"
+
+
 def _log_backoff(details):
     """Callback invoked by backoff before each retry attempt."""
     LOGGER.warning(
         "Retry attempt %d for %s after %.1fs wait. Exception: %s",
         details.get("tries", 0),
-        details["args"][1] if len(details.get("args", [])) > 1 else "unknown endpoint",
+        _get_endpoint_from_details(details),
         details.get("wait", 0),
         details.get("exception", "unknown"),
     )
@@ -32,7 +56,7 @@ def _log_giveup(details):
     LOGGER.error(
         "Giving up after %d tries for %s. Final exception: %s",
         details.get("tries", 0),
-        details["args"][1] if len(details.get("args", [])) > 1 else "unknown endpoint",
+        _get_endpoint_from_details(details),
         details.get("exception", "unknown"),
     )
 
@@ -77,7 +101,7 @@ def raise_for_error(response: requests.Response) -> None:
             LOGGER.warning(
                 "Server error %d on %s: %s",
                 response.status_code,
-                getattr(response, 'url', 'unknown'),
+                _sanitize_url(getattr(response, 'url', 'unknown')),
                 message,
             )
 
