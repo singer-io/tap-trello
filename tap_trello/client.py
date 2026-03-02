@@ -39,17 +39,14 @@ def raise_for_error(response: requests.Response) -> None:
             error_message = mapping.get("message", default_message)
             message = f"HTTP-error-code: {response.status_code}, Error: {response_json.get('message', error_message)}"
 
-        exc = mapping.get("raise_exception", TrelloError)
-
-        # For 5xx errors, use backoff exception if not specifically mapped
-        if 500 <= response.status_code < 600:
-            exc = ERROR_CODE_EXCEPTION_MAPPING.get(response.status_code, {}).get(
-                "raise_exception", TrelloBackoffError
-            )
-        else:
-            exc = ERROR_CODE_EXCEPTION_MAPPING.get(response.status_code, {}).get(
-                "raise_exception", TrelloError
-            )
+        # Determine the exception class once, defaulting to a backoff error
+        # for unmapped 5xx responses and a generic TrelloError otherwise.
+        exc = mapping.get("raise_exception")
+        if exc is None:
+            if 500 <= response.status_code < 600:
+                exc = TrelloBackoffError
+            else:
+                exc = TrelloError
         raise exc(message, response) from None
 
 
