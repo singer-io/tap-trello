@@ -111,8 +111,3 @@ ERROR_CODE_EXCEPTION_MAPPING = {
         "message": "The server did not receive a timely response from an upstream server."
     }
 }
-
-DEFAULT_5XX_EXCEPTION = {
-    "raise_exception": TrelloBackoffError,
-    "message": "An unexpected server error occurred."
-}
