@@ -16,8 +16,6 @@ class TrelloAutomaticFields(MinimumSelectionTest, TrelloBaseTest):
         # Exclude streams with insufficient records to test automatic fields
         streams_to_exclude = {
             "board_memberships",
-            "board_custom_fields",
-            "card_custom_field_items",
             "members",
             "organizations",
             "organization_actions",
