@@ -17,6 +17,8 @@ class TrelloAllFields(AllFieldsTest, TrelloBaseTest):
     def streams_to_test(self):
         # Exclude streams with insufficient records to test all fields
         streams_to_exclude = {
+            "board_custom_fields",
+            "card_custom_field_items",
             "board_memberships",
             "checklists",
             "members",
