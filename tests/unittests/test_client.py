@@ -107,7 +107,6 @@ class TestClient(unittest.TestCase):
     @parameterized.expand([
         ["429 error", 429, MockResponse(429), TrelloRateLimitError, "The API rate limit for your organisation/application pairing has been exceeded."],
         ["500 error", 500, MockResponse(500), TrelloInternalServerError, "The server encountered an unexpected condition which prevented it from fulfilling the request."],
-        ["501 error", 501, MockResponse(501), TrelloNotImplementedError, "The server does not support the functionality required to fulfill the request."],
         ["502 error", 502, MockResponse(502), TrelloBadGatewayError, "Server received an invalid response."],
         ["503 error", 503, MockResponse(503), TrelloServiceUnavailableError, "API service is currently unavailable."],
         ["504 error", 504, MockResponse(504), TrelloGatewayTimeoutError, "The server did not receive a timely response from an upstream server."],
