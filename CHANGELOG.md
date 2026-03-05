@@ -1,6 +1,6 @@
 # Changelog
 
-## 1.1.1
+## 1.1.2
   * Improved 5xx error handling [49](https://github.com/singer-io/tap-trello/pull/49)
 
 ## 1.1.1

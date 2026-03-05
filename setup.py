@@ -3,7 +3,7 @@ from setuptools import find_packages, setup
 
 setup(
     name="tap-trello",
-    version="1.2.0",
+    version="1.1.2",
     description="Singer.io tap for extracting data from Trello API",
     author="Stitch",
     url="http://singer.io",
