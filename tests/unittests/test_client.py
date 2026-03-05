@@ -32,7 +32,6 @@ class MockResponse:
         self.raise_error = raise_error
         self.text = text
         self.reason = "error"
-        self.url = "https://api.example.com/resource"
 
     def raise_for_status(self):
         """If an error occur, this method returns a HTTPError object.
