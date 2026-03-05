@@ -1,7 +1,6 @@
 import singer
 
 from tap_trello.streams.abstracts import ChildStream
-from tap_trello.streams.boards import Boards
 
 LOGGER = singer.get_logger()
 
@@ -12,7 +11,7 @@ class Cards(ChildStream):
     endpoint = "/boards/{}/cards/all"
     key_properties = ["id"]
     replication_method = "FULL_TABLE"
-    parent = Boards
+    parent = "boards"
     MAX_API_RESPONSE_SIZE = 1000
 
     def _get_dropdown_option_key(self, field_id, option_id):

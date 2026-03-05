@@ -251,7 +251,7 @@ class LegacyChildStream(LegacyStream):
         # and yield them to be used in child's sync
         LOGGER.info("%s - Retrieving IDs of parent stream: %s",
                     self.stream_id,
-                    self.parent.stream_id)
+                    self.parent)
         for parent_obj in parent.get_records(parent.get_format_values(), additional_params={"fields": "id"}):
             yield parent_obj['id']
 
@@ -272,7 +272,10 @@ class LegacyChildStream(LegacyStream):
 
     def sync(self):
         self.on_window_started()
-        parent = self.parent(self.client, self.config, self.state)
+
+        from tap_trello.streams import STREAMS
+        parent_class = STREAMS[self.parent]
+        parent = parent_class(self.client, self.config, self.state)
 
         # Get the most recent parent ID and resume from there, if necessary
         bookmarked_parent = singer.get_bookmark(self.state, self.stream_id, 'parent_id')

@@ -59,3 +59,9 @@ class OrganizationActions(ChildBaseStream):
 
         raw_records, _ = self._normalize_response(response, url)
         yield from raw_records
+
+    def modify_object(self, record, parent_record=None):
+        """Add organization_id to organization action records."""
+        if parent_record and 'id' in parent_record:
+            record["organization_id"] = parent_record['id']
+        return record
