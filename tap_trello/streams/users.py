@@ -1,5 +1,4 @@
 from tap_trello.streams.abstracts import Unsortable, ChildStream
-from tap_trello.streams.boards import Boards
 
 
 class Users(Unsortable, ChildStream):
@@ -8,7 +7,7 @@ class Users(Unsortable, ChildStream):
     endpoint = "/boards/{}/members"
     key_properties = ["id", "boardId"]
     replication_method = "FULL_TABLE"
-    parent = Boards
+    parent = "boards"
 
     def modify_record(self, record, **kwargs):
         """Add boardId to user records."""

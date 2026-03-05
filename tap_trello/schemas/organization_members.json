@@ -36,7 +36,10 @@
             ]
         },
         "bioData": {
-            "type": "object",
+            "type": [
+                "null",
+                "object"
+            ],
             "properties": {
                 "emoji": {
                     "type": [
@@ -108,7 +111,10 @@
             ]
         },
         "nonPublic": {
-            "type": "object",
+            "type": [
+                "null",
+                "object"
+            ],
             "properties": {
                 "fullName": {
                     "type": [
@@ -247,7 +253,10 @@
             }
         },
         "limits": {
-            "type": "object",
+            "type": [
+                "null",
+                "object"
+            ],
             "properties": {
                 "status": {
                     "type": [
@@ -283,7 +292,10 @@
             }
         },
         "marketingOptIn": {
-            "type": "object",
+            "type": [
+                "null",
+                "object"
+            ],
             "properties": {
                 "optedIn": {
                     "type": [
@@ -301,7 +313,10 @@
             }
         },
         "messagesDismissed": {
-            "type": "object",
+            "type": [
+                "null",
+                "object"
+            ],
             "properties": {
                 "name": {
                     "type": [
@@ -343,10 +358,16 @@
             }
         },
         "prefs": {
-            "type": "object",
+            "type": [
+                "null",
+                "object"
+            ],
             "properties": {
                 "timezoneInfo": {
-                    "type": "object",
+                    "type": [
+                        "null",
+                        "object"
+                    ],
                     "properties": {
                         "offsetCurrent": {
                             "type": [
@@ -382,7 +403,10 @@
                     }
                 },
                 "privacy": {
-                    "type": "object",
+                    "type": [
+                        "null",
+                        "object"
+                    ],
                     "properties": {
                         "fullName": {
                             "type": [
@@ -435,7 +459,10 @@
                     ]
                 },
                 "twoFactor": {
-                    "type": "object",
+                    "type": [
+                        "null",
+                        "object"
+                    ],
                     "properties": {
                         "enabled": {
                             "type": [
