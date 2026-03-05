@@ -1,5 +1,8 @@
 # Changelog
 
+## 1.1.2
+  * Improved 5xx error handling [49](https://github.com/singer-io/tap-trello/pull/49)
+
 ## 1.1.1
   * Updates dependency versions for twistlock compliance
   * Updates circle config and tests fix failing build

@@ -106,9 +106,9 @@ class TestClient(unittest.TestCase):
     @parameterized.expand([
         ["429 error", 429, MockResponse(429), TrelloRateLimitError, "The API rate limit for your organisation/application pairing has been exceeded."],
         ["500 error", 500, MockResponse(500), TrelloInternalServerError, "The server encountered an unexpected condition which prevented it from fulfilling the request."],
-        ["501 error", 501, MockResponse(501), TrelloNotImplementedError, "The server does not support the functionality required to fulfill the request."],
         ["502 error", 502, MockResponse(502), TrelloBadGatewayError, "Server received an invalid response."],
         ["503 error", 503, MockResponse(503), TrelloServiceUnavailableError, "API service is currently unavailable."],
+        ["504 error", 504, MockResponse(504), TrelloGatewayTimeoutError, "The server did not receive a timely response from an upstream server."],
     ])
     @patch("time.sleep")
     def test_make_request_http_failure_with_retry(self, test_name, error_code, mock_response, error, error_message, mock_sleep):
@@ -135,3 +135,18 @@ class TestClient(unittest.TestCase):
                 self.client._Client__make_request("GET", "https://api.example.com/resource")
 
             self.assertEqual(mock_request.call_count, 5)
+
+    @patch("time.sleep")
+    def test_unmapped_5xx_triggers_retry_via_catch_all(self, mock_sleep):
+        """Unmapped 5xx codes (e.g., 520) should raise TrelloBackoffError and be retried."""
+        mock_response = MockResponse(520)
+
+        with patch.object(self.client._session, "request", return_value=mock_response) as mock_request:
+            with self.assertRaises(TrelloBackoffError) as ctx:
+                self.client._Client__make_request("GET", "https://api.example.com/resource")
+
+            expected_message = "HTTP-error-code: 520, Error: An unexpected server error occurred."
+            self.assertEqual(str(ctx.exception), expected_message)
+            self.assertEqual(mock_request.call_count, 5)
+
+
