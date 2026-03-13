@@ -1,8 +1,6 @@
 {
-  "type": [
-    "null",
-    "object"
-  ],
+  "type": "object",
+  "additionalProperties": false,
   "properties": {
     "id": {
       "type": [
@@ -72,7 +70,8 @@
                 "type": [
                   "null",
                   "string"
-                ]
+                ],
+                "format": "date-time"
               },
               "number": {
                 "type": [
@@ -148,7 +147,8 @@
             "object"
           ],
           "properties": {
-          }
+          },
+          "additionalProperties": true
         }
       }
     },

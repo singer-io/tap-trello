@@ -14,6 +14,7 @@ from tap_trello.exceptions import (ERROR_CODE_EXCEPTION_MAPPING,
 LOGGER = get_logger()
 REQUEST_TIMEOUT = 300
 
+
 def raise_for_error(response: requests.Response) -> None:
     """Raises the associated response exception. Takes in a response object,
     checks the status code, and throws the associated exception based on the
@@ -26,16 +27,27 @@ def raise_for_error(response: requests.Response) -> None:
     except Exception:
         response_json = {}
     if response.status_code not in [200, 201, 204]:
+        mapping = ERROR_CODE_EXCEPTION_MAPPING.get(response.status_code, {})
         if response_json.get("error"):
             message = f"HTTP-error-code: {response.status_code}, Error: {response_json.get('error')}"
         else:
-            error_message = ERROR_CODE_EXCEPTION_MAPPING.get(
-                response.status_code, {}
-            ).get("message", "Unknown Error")
+            # New 5xx errors may be added by Trello without notice; ensure they get
+            # a user-friendly message instead of falling back to "Unknown Error"
+            if not mapping and 500 <= response.status_code < 600:
+                default_message = "An unexpected server error occurred."
+            else:
+                default_message = "Unknown Error"
+            error_message = mapping.get("message", default_message)
             message = f"HTTP-error-code: {response.status_code}, Error: {response_json.get('message', error_message)}"
-        exc = ERROR_CODE_EXCEPTION_MAPPING.get(response.status_code, {}).get(
-            "raise_exception", TrelloError
-        )
+
+        # Determine the exception class once, defaulting to a backoff error
+        # for unmapped 5xx responses and a generic TrelloError otherwise.
+        exc = mapping.get("raise_exception")
+        if exc is None:
+            if 500 <= response.status_code < 600:
+                exc = TrelloBackoffError
+            else:
+                exc = TrelloError
         raise exc(message, response) from None
 
 
