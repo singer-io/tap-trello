@@ -60,7 +60,9 @@
                 "null",
                 "array"
             ],
-            "additionalProperties": true
+            "items": {
+                "type": "string"
+            }
         },
         "url": {
             "type": [
