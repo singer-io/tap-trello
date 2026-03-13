@@ -48,7 +48,8 @@
                         "null",
                         "object"
                     ],
-                    "properties": {}
+                    "properties": {},
+                    "additionalProperties": true
                 }
             },
             "additionalProperties": true

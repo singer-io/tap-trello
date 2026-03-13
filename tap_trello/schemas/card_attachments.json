@@ -1,5 +1,6 @@
 {
     "type": "object",
+    "additionalProperties": false,
     "properties": {
         "id": {
             "type": [
@@ -59,9 +60,7 @@
                 "null",
                 "array"
             ],
-            "items": {
-                "type": "string"
-            }
+            "additionalProperties": true
         },
         "url": {
             "type": [

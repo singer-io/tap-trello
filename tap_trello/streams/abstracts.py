@@ -273,6 +273,8 @@ class LegacyChildStream(LegacyStream):
     def sync(self):
         self.on_window_started()
 
+        # Import here to avoid circular dependency: abstracts.py is imported by individual
+        # stream modules before STREAMS dict is fully initialized in streams/__init__.py
         from tap_trello.streams import STREAMS
         parent_class = STREAMS[self.parent]
         parent = parent_class(self.client, self.config, self.state)

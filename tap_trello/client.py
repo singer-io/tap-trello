@@ -31,7 +31,8 @@ def raise_for_error(response: requests.Response) -> None:
         if response_json.get("error"):
             message = f"HTTP-error-code: {response.status_code}, Error: {response_json.get('error')}"
         else:
-            # For unmapped 5xx, provide a meaningful default message
+            # New 5xx errors may be added by Trello without notice; ensure they get
+            # a user-friendly message instead of falling back to "Unknown Error"
             if not mapping and 500 <= response.status_code < 600:
                 default_message = "An unexpected server error occurred."
             else:
