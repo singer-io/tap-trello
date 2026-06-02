@@ -1,5 +1,9 @@
 # Changelog
 
+# 1.1.3
+  * Bump requests to 2.33.0 for security updates [#52](https://github.com/singer-io/tap-trello/pull/52)
+
+
 ## 1.1.2
   * Improved 5xx error handling [49](https://github.com/singer-io/tap-trello/pull/49)
 
